@@ -44,7 +44,31 @@ public:
 		initial_l2(init_l2),
 		max_state_index(0)
 	{
-		create_initial_partition();
+		to_be_processed.clear();
+		block initial_block = block();
+		for (state_type i = 0; i < aut.num_states(); i++) {
+			initial_block.states.push_back(i);
+		}
+		sort_transitions(aut.get_transitions(), mcrl2::lts::lbl_tgt_src);
+		const std::vector<transition>& trans = aut.get_transitions();
+		for (std::vector<transition>::const_iterator r = trans.begin(); r != trans.end(); ++r)
+		{
+			initial_block.transitions.push_back(*r);
+		}
+		initial_block.block_index = 0;
+		initial_block.state_index = 0;
+		max_state_index = 1;
+		initial_block.parent_block_index = 0;
+		initial_block.level = 0;
+		blocks.emplace_back(initial_block);
+
+		block_index_of_a_state = std::vector < block_index_type >(aut.num_states(), 0);
+		block_flags.push_back(false);
+		state_flags = std::vector < bool >(aut.num_states(), false);
+		to_be_processed.push_back(0);
+		BL.clear();
+		// finished creating initial data structures
+		
 		bool splitted = true;
 		level_type lvl = 1;
 		while (splitted && block_index_of_a_state[initial_l2] == block_index_of_a_state[aut.initial_state()])
