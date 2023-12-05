@@ -82,7 +82,7 @@ bool destructive_compare(LTS_TYPE& l1,
         mCRL2log(mcrl2::log::warning) << "A slower partition refinement algorithm is used to generate minimal-depth counter examples.\n";
         return detail::destructive_bisimulation_compare_minimal_depth(l1,l2, false,false,true,counter_example_file,structured_output);
       }
-      return detail::destructive_bisimulation_compare_dnj(l1,l2, false,false,generate_counter_examples,counter_example_file,structured_output);
+      return detail::destructive_bisimulation_compare_martens(l1,l2, false,false,generate_counter_examples,counter_example_file,structured_output);
     }
     case lts_eq_bisim_gv:
     {
@@ -614,7 +614,7 @@ void reduce(LTS_TYPE& l,lts_equivalence eq)
     }
     case lts_eq_bisim_gv:
     {
-      detail::bisimulation_reduce(l,false,false);
+      detail::bisimulation_reduce_martens(l,false,false);
       return;
     }
     case lts_eq_bisim_gjkw:

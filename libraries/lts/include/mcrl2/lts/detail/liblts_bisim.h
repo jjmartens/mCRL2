@@ -19,6 +19,7 @@
 #include "mcrl2/lts/lts_fsm.h"
 #include "mcrl2/lts/lts_dot.h"
 #include "mcrl2/lts/detail/liblts_bisim_minimal_depth.h"
+#include "mcrl2/lts/detail/liblts_bisim_m_2.h"
 
 namespace mcrl2
 {
@@ -1183,6 +1184,56 @@ bool destructive_bisimulation_compare_minimal_depth(
     mCRL2log(mcrl2::log::info) << "Saved counterexample to: \"" << filename << "\"" << std::endl;
     return false;
 }
+
+template < class LTS_TYPE>
+bool destructive_bisimulation_compare_martens(
+    LTS_TYPE& l1,
+    LTS_TYPE& l2,
+    const bool branching /* =false*/,
+    const bool preserve_divergences /*=false*/,
+    const bool generate_counter_examples /* = false */,
+    const std::string& counter_example_file /*= ""*/,
+    const bool /*structured_output = false */)
+{
+    assert(branching == false && preserve_divergences == false && generate_counter_examples == false);
+    std::size_t init_l2 = l2.initial_state() + l1.num_states();
+    mcrl2::lts::detail::merge(l1, l2);
+    l2.clear(); // No use for l2 anymore.
+    detail::bisim_partitioner_martens<LTS_TYPE> bisim_partitioner_martens(l1);
+    if (bisim_partitioner_martens.in_same_class(l1.initial_state(), init_l2))
+    {
+        return true;
+    }
+    //LTSs are not bisimilar, we can create a counter example. 
+    std::string filename = "Counterexample.mcf";
+    if (!counter_example_file.empty()) {
+        filename = counter_example_file;
+    }
+    return false;
+}
+
+template <class LTS_TYPE>
+void bisimulation_reduce_martens(LTS_TYPE& l, bool const branching = false,
+    bool const preserve_divergence = false)
+{
+    if (1 >= l.num_states())
+    {
+        
+    }
+    // Line 2.1: Find tau-SCCs and contract each of them to a single state
+    if (branching)
+    {
+        return;
+    }
+
+    // Now apply the branching bisimulation reduction algorithm.  If there
+    // are no taus, this will automatically yield strong bisimulation.
+    bisim_partitioner_martens<LTS_TYPE> bisim_part(l);
+    // Assign the reduced LTS
+    //bisim_part.finalize_minimized_LTS();
+}
+
+
 
 
 /** \brief Checks whether the two initial states of two lts's are strong or branching bisimilar.
