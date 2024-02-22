@@ -8,7 +8,8 @@
 // http://www.boost.org/LICENSE_1_0.txt)
 /// \file lts/detail/liblts_bisim_m.h
 ///
-/// \brief Partition refinement algorithm for guaruanteed minimal depth
+/// \brief Partition refinement for strong bisimularity reduction.
+/// Based on the paper "Fast coalgebraic bisimilarity minimization." - Jacobs, Jules, and Thorsten Wiﬂmann.
 /// counter-examples.
 ///
 /// \details 
@@ -23,6 +24,7 @@
 #include "mcrl2/lts/lts_fsm.h"
 #include "mcrl2/lts/lts_dot.h"
 
+//#define UORDERED
 namespace mcrl2
 {
 namespace lts
@@ -45,31 +47,46 @@ public:
         auto start = std::chrono::high_resolution_clock::now();
 
         const std::vector<transition>& trans = aut.get_transitions();
+
        //Initialize arrays for pred and suc, blocks and state2loc and loc2state
-       pred = new std::vector<transition>[aut.num_states()];
-       suc  = new std::vector<transition>[aut.num_states()];
+       pred = new std::vector<custom_transition_type>[aut.num_states()];
+       suc  = new std::vector<custom_transition_type>[aut.num_states()];
+
        blocks = new block_type[aut.num_states()];
        state2loc = new state_type[aut.num_states()];
        loc2state = new state_type[aut.num_states()];
+       
+       std::vector<int> state2in = std::vector<int>(aut.num_states(), 0);
+       std::vector<int> state2out = std::vector<int>(aut.num_states(), 0);
+       mCRL2log(mcrl2::log::debug) << "start moving transitions " << std::endl;
+       //Count transitions per state
+       for (auto r = trans.begin(); r != trans.end(); r++) {
+           state2in[(*r).to()] += 1;
+           state2out[(*r).from()] += 1;
+       }
+
        for (state_type s = 0; s < aut.num_states(); ++s)
 	   {
-           pred[s] = std::vector<transition>();
-           suc[s] = std::vector<transition>();
+           pred[s] = std::vector<custom_transition_type>(state2in[s]);
+           suc[s] = std::vector<custom_transition_type>(state2out[s]);
 	   }
-
-
-       for (std::vector<transition>::const_iterator r = trans.begin(); r != trans.end(); ++r)
+	   mCRL2log(mcrl2::log::debug) << "now placing in correct place " << std::endl;
+       for (auto r = trans.begin(); r != trans.end(); r++)
        {
-           pred[(*r).to()].push_back(*r);
-           suc[(*r).from()].push_back(*r);
+           state2in[(*r).to()] -= 1;
+           pred[(*r).to()][state2in[(*r).to()]] = std::make_pair((*r).label(), (*r).from());
+           state2out[(*r).from()] -= 1;
+           suc[(*r).from()][state2out[(*r).from()]] = std::make_pair((*r).label(), (*r).to());
        }
+       mCRL2log(mcrl2::log::debug) << "moved all transitions" << std::endl;
 
         //Initialize block map
        worklist = std::queue<block_type>();
        block_map = std::map<block_type, block>();
-       
-       block b0 = block{0,0,aut.num_states()};
-        for (state_type i = 0; i < aut.num_states(); ++i)
+
+
+       block b0 = block{0,0,(unsigned int) aut.num_states()};
+        for (state_type i = 0; i < (unsigned int) aut.num_states(); ++i)
         {
             blocks[i] = 0; 
         }
@@ -133,33 +150,20 @@ private:
     typedef std::size_t label_type;
     typedef std::size_t block_type;
     typedef std::pair<label_type, block_type> observation_type;
-    
-    struct signaturehash {
-        std::size_t operator()(const std::set<observation_type>& obsset) const
-        {
-            long long hash{ 0 };
-            for (auto obs : obsset) {
-                hash = hash ^ (std::hash<std::size_t>()(obs.first) ^ std::hash<std::size_t>()(obs.second));
-            }
-            return hash;
-        }
-    };
-
-    size_t hash_pair(const std::pair<size_t, size_t>& p) const
-	{
-		return std::hash<size_t>{}(p.first) ^ std::hash<size_t>{}(p.second);
-	}
-
-
+    typedef std::pair<label_type, state_type> custom_transition_type;
 
     //Typedef for signature
-    typedef std::unordered_set<observation_type, signaturehash> signature_type;
+#ifdef UORDERED
+	typedef std::set<observation_type> signature_type;
+#else
+    typedef std::set<observation_type> signature_type;
+#endif
     
     state_type max_state_index;
     LTS_TYPE& aut;
     // Array of vectors of predeccessors and successors
-    std::vector<transition>* pred; 
-    std::vector<transition>* suc;
+    std::vector<custom_transition_type>* pred; 
+    std::vector<custom_transition_type>* suc;
     
     //Struct block with start, mid, end beingpointers
     struct block
@@ -167,9 +171,22 @@ private:
 		state_type start;
 		state_type mid;
 		state_type end;
-
+        //std::unordered_set<label_type> unstable_labels;
 	};
 
+    struct sigHash
+    {
+        std::size_t operator()(signature_type const& s) const
+        {
+            std::size_t res = 0;
+            for (auto t : s)
+			{
+				res = res ^ t.first;
+				res = res ^ t.second;
+			}
+            return res;
+        }
+    };
 
     block_type* blocks;
     std::map<block_type, block> block_map;
@@ -182,12 +199,17 @@ private:
         block_type Bid = blocks[s];
         block B = block_map[Bid];
         state_type loc = state2loc[s];
+        //Add label to unstable labels
+        /*if (B.unstable_labels.find(a) == B.unstable_labels.end()) {
+            block_map[Bid].unstable_labels.insert(a);
+        }*/
+
         if (loc < B.start || loc > B.end) {
             mCRL2log(mcrl2::log::info) << "KAPUT "<< loc << " " << B.start << " " << B.mid << " " << B.end << std::endl;
         }
 
-        if (B.mid <= loc) {
-            //Already dirty
+        if (B.mid <= loc or B.start >= B.end-1) {
+            //Already dirty or only 1 state
             return;
         }
         if (B.mid == B.end) {
@@ -206,56 +228,63 @@ private:
 	}
     
     //Signature of a state
-    signature_type sig(state_type s)
+    void sig(const state_type& s, signature_type& retsignature)
     {
-        signature_type signature;
-		for (std::vector<transition>::iterator r = suc[s].begin(); r != suc[s].end(); r++)
-		{
+        for (auto t : suc[s])
+        {
+            auto sig = std::make_pair(t.first, blocks[t.second]);
             // Add observation of r to sig
-            signature.insert(std::pair<label_type, block_type>((*r).label(), blocks[(*r).to()]));
-		}
-		return signature;
+            retsignature.insert(sig);
+        }
     }
 
     //Split block based on signature
-    std::vector<block_type> split(block_type Bid)
+    int split(block_type Bid)
     {
 		block B = block_map[Bid];
 		if (B.mid == B.end)
 		{
 			//Block is clean (should not happen)
-			return std::vector<block_type>();
+            mCRL2log(mcrl2::log::debug) << "Block clean but in worklist!? should not happen." << std::endl;
+			return 0;
 		}
-		std::unordered_map<signature_type, block_type> sig2block;
+#ifdef UORDERED
+        std::unordered_map<signature_type, block_type, sigHash> sig2block;
+#else  
+        std::map<signature_type, block_type> sig2block;
+#endif
         int j = 0;
         block_type* state2block = new block_type[B.end - B.mid];
+        mCRL2log(mcrl2::log::debug) << "Computing signatures from here. :" << std::endl;
 
         //Add signature of one clean state
+        signature_type signature;
+
         if (B.mid != B.start) {
 			state_type s = loc2state[B.start];
-			signature_type signature = sig(s);
-			sig2block.insert(std::pair<signature_type, block_type>(signature, j));
-            state2block[B.mid] = j;
+            signature.clear();
+            sig(loc2state[s], signature);
+			sig2block.insert(std::make_pair(signature, j));
             j += 1;
 		}
 		//Add signatures of dirty states
 		for (state_type s = B.mid; s < B.end; s++)
 		{
-			signature_type signature = sig(loc2state[s]);
-            if (sig2block.find(signature) == sig2block.end())
-            {
-                //New signature
-                sig2block.insert(std::pair<signature_type, block_type>(signature, j));
+            signature.clear();
+			sig(loc2state[s], signature);
+            auto ret = sig2block.insert(std::make_pair(signature, j));
+            if (ret.second) {
                 j += 1;
-            }
-            state2block.insert(std::pair<state_type, block_type>(loc2state[s], sig2block[signature]));
+            } 
+            state2block[s-B.mid] = (*ret.first).second;
 		}
         if (j == 1) {
             //Only one signature, no need to split
+            mCRL2log(mcrl2::log::debug) << "no new signatures." << B.end - B.start << B.mid - B.start << std::endl;
             block_map[Bid].mid = B.end;
-            return std::vector<block_type>();
+            return 0;
         }
-
+		//Count number of occurrences each signature
         int* Sizes = new int[j+1];
         for (int i = 0; i <= j; i++)
 		{
@@ -264,7 +293,7 @@ private:
         //Sizes[0] = B.mid - B.start;
         for (state_type s = B.mid; s < B.end; s++)
         {
-            Sizes[state2block[loc2state[s]]] += 1;
+            Sizes[state2block[s-B.mid]] += 1;
         }
 
         //Create new blocks
@@ -287,25 +316,23 @@ private:
         {
             Sizes[i+1] += Sizes[i];
         }
+
         int num_dirty = B.end - B.mid;
         state_type* dirty = new state_type[num_dirty];
-
-        /*for (state_type i = 0; i < num_dirty; i++) {
-			dirty[i] = loc2state[B.mid + i];
-		}*/
-
         std::copy(loc2state + B.mid, loc2state + B.end, dirty);
         //Reorder states
-        //i + 1 >= B.mid + 1 is a hack because of unsigned ints
+
+        mCRL2log(mcrl2::log::debug) << "Rearranging states." << std::endl;
+
         for (state_type i = 0; i < num_dirty; i++) {
             state_type si = dirty[i];
-            if(Sizes[state2block[si]] == 0) {
+            if(Sizes[state2block[i]] == 0) {
 				//Impossible
                 mCRL2log(mcrl2::log::info) << "Impossible" << si << " " << state2block[si] << std::endl;
 				continue;
 			}
-            Sizes[state2block[si]] -= 1;
-            int tmp = B.mid + Sizes[state2block[si]];
+            Sizes[state2block[i]] -= 1;
+            int tmp = B.mid + Sizes[state2block[i]];
             loc2state[tmp] = si;
             state2loc[si] = tmp;
 		}
@@ -314,18 +341,8 @@ private:
             mCRL2log(mcrl2::log::info) << "Assertion failed Sizes inccorrect" << std::endl;
         }
         // create new blocks
-        std::vector<block_type> new_blocks = std::vector<block_type>();
         state_type old_start = B.mid;
         state_type old_end = B.end;
-        //mCRL2log(mcrl2::log::debug) << "Bmid" << B.mid << std::endl;
-        /*int num_err = 0;
-        for (state_type locs = B.start; locs < B.mid; locs++) {
-            if(sig2block[sig(loc2state[locs])] != 0) {
-                num_err += 1;
-                mCRL2log(mcrl2::log::debug) << locs << std::endl;
-            }
-        }*/
-        //mCRL2log(mcrl2::log::debug) << "num_err:" << num_err << std::endl;
 
         for (int i = 0; i < j; i++)
         {
@@ -341,68 +358,71 @@ private:
                 B.start = newstart;
                 B.mid = newend;
                 B.end = newend;
+                // B.unstable_labels = std::unordered_set<label_type>();
                 block_map[Bid] = B;
             }
             else {
                 block_type newBid = block_map.size();
-                block newB = block{ newstart, newend, newend };
+                block newB = block{ newstart, newend, newend };// std::unordered_set<label_type>()
                 block_map.insert(std::pair<block_type, block>(newBid, newB));
                 for (state_type locs = newB.start; locs < newB.end; locs++)
                 {
                    blocks[loc2state[locs]] = newBid; 
                 }
-                new_blocks.push_back(newBid);
             }
 		}
 
         delete[] Sizes;
         delete[] dirty;
-        return new_blocks;
+        delete[] state2block;
+        return block_map.size();
     }
 
     //Refine based on sigs
     void refine()
     {
         int iter = 0;
-        std::vector<block_type> new_blocks;
-
+        int new_blocks = 0;
+        int old_blocks = 0;
+        mCRL2log(mcrl2::log::info) << "Start refinement" << std::endl;
 		while (!worklist.empty())
 		{
             iter += 1;
 			block_type Bid = worklist.front();
 			worklist.pop();
+
 			block B = block_map[Bid];
 
-            int num_dirtyeightysource = 0;
-            int num_dirtyeightytarget = 0;
             //Count states
-
 			if (B.mid == B.end and B.end > B.start + 1)
 			{
 				//Block is clean (should not happen)
                 mCRL2log(mcrl2::log::info) << "Block clean but in worklist!? should not happen." << std::endl;
             }
             else {
-                //new_blocks = split_complete(Bid);
-                new_blocks = split(Bid);
+                mCRL2log(mcrl2::log::debug) << "start iter" << std::endl;
 
-                for (auto blockid : new_blocks)
+                old_blocks = block_map.size();
+                split(Bid);
+                mCRL2log(mcrl2::log::debug) << "new blocks created = " << block_map.size() - new_blocks << std::endl;
+                for (int blockid = old_blocks; blockid < block_map.size(); blockid++)
                 {
+                    mCRL2log(mcrl2::log::debug) << "marking dirty " << blockid << std::endl;
                     block newB = block_map[blockid];
 
-                    std::vector<state_type> overlap;
+                    std::vector<observation_type> overlap;
                     for (state_type s = newB.start; s < newB.end; s++) {
-                        for (auto  r : pred[loc2state[s]]) {
-                            if(blocks[r.from()] == blockid) {
-								overlap.push_back(r.from());
+                        for (custom_transition_type  t : pred[loc2state[s]]) {
+                            if(blocks[t.second] == blockid) {
+								overlap.push_back(t);
                             }
                             else {
-                                mark_dirty(r.from());
+                                mark_dirty(t.second);
                             }
                         }
                     }
                     for (auto s : overlap) {
-						mark_dirty(s);
+						mark_dirty(s.second);
 					}
                 }
             }
