@@ -614,7 +614,7 @@ void reduce(LTS_TYPE& l,lts_equivalence eq)
     }
     case lts_eq_bisim_gv:
     {
-      detail::bisimulation_reduce_martens(l,false,false);
+      detail::bisimulation_reduce_martens(l,true,false); // Hack to use my algorithm, do not commit this.
       return;
     }
     case lts_eq_bisim_gjkw:
