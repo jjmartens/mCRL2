@@ -141,11 +141,17 @@ const atermpp::aterm_appl& default_value_LinearProcessInit();
 const atermpp::aterm_appl& default_value_StateTrue();
 const atermpp::aterm_appl& default_value_StateFalse();
 const atermpp::aterm_appl& default_value_StateNot();
+const atermpp::aterm_appl& default_value_StateMinus();
 const atermpp::aterm_appl& default_value_StateAnd();
 const atermpp::aterm_appl& default_value_StateOr();
 const atermpp::aterm_appl& default_value_StateImp();
+const atermpp::aterm_appl& default_value_StatePlus();
+const atermpp::aterm_appl& default_value_StateConstantMultiply();
+const atermpp::aterm_appl& default_value_StateConstantMultiplyAlt();
 const atermpp::aterm_appl& default_value_StateForall();
 const atermpp::aterm_appl& default_value_StateExists();
+const atermpp::aterm_appl& default_value_StateInfimum();
+const atermpp::aterm_appl& default_value_StateSupremum();
 const atermpp::aterm_appl& default_value_StateMust();
 const atermpp::aterm_appl& default_value_StateMay();
 const atermpp::aterm_appl& default_value_StateYaled();
@@ -190,18 +196,26 @@ const atermpp::aterm_appl& default_value_PBESImp();
 const atermpp::aterm_appl& default_value_PBESForall();
 const atermpp::aterm_appl& default_value_PBESExists();
 const atermpp::aterm_appl& default_value_PropVarInst();
-const atermpp::aterm_appl& default_value_BES();
-const atermpp::aterm_appl& default_value_BooleanEquation();
-const atermpp::aterm_appl& default_value_BooleanVariable();
-const atermpp::aterm_appl& default_value_BooleanTrue();
-const atermpp::aterm_appl& default_value_BooleanFalse();
-const atermpp::aterm_appl& default_value_BooleanNot();
-const atermpp::aterm_appl& default_value_BooleanAnd();
-const atermpp::aterm_appl& default_value_BooleanOr();
-const atermpp::aterm_appl& default_value_BooleanImp();
-const atermpp::aterm_appl& default_value_BddTrue();
-const atermpp::aterm_appl& default_value_BddFalse();
-const atermpp::aterm_appl& default_value_BddIf();
+const atermpp::aterm_appl& default_value_PRES();
+const atermpp::aterm_appl& default_value_PREqnSpec();
+const atermpp::aterm_appl& default_value_PRInit();
+const atermpp::aterm_appl& default_value_PREqn();
+const atermpp::aterm_appl& default_value_PRESTrue();
+const atermpp::aterm_appl& default_value_PRESFalse();
+const atermpp::aterm_appl& default_value_PRESMinus();
+const atermpp::aterm_appl& default_value_PRESAnd();
+const atermpp::aterm_appl& default_value_PRESOr();
+const atermpp::aterm_appl& default_value_PRESImp();
+const atermpp::aterm_appl& default_value_PRESPlus();
+const atermpp::aterm_appl& default_value_PRESConstantMultiply();
+const atermpp::aterm_appl& default_value_PRESConstantMultiplyAlt();
+const atermpp::aterm_appl& default_value_PRESInfimum();
+const atermpp::aterm_appl& default_value_PRESSupremum();
+const atermpp::aterm_appl& default_value_PRESSum();
+const atermpp::aterm_appl& default_value_PRESEqInf();
+const atermpp::aterm_appl& default_value_PRESEqNInf();
+const atermpp::aterm_appl& default_value_PRESCondSm();
+const atermpp::aterm_appl& default_value_PRESCondEq();
 const atermpp::aterm_appl& default_value_SortExpr();
 const atermpp::aterm_appl& default_value_SortConsType();
 const atermpp::aterm_appl& default_value_DataExpr();
@@ -218,8 +232,7 @@ const atermpp::aterm_appl& default_value_ParamIdOrAction();
 const atermpp::aterm_appl& default_value_ActionRenameRuleRHS();
 const atermpp::aterm_appl& default_value_FixPoint();
 const atermpp::aterm_appl& default_value_PBExpr();
-const atermpp::aterm_appl& default_value_BooleanExpression();
-const atermpp::aterm_appl& default_value_BddExpression();
+const atermpp::aterm_appl& default_value_PRExpr();
 
 // SortCons
 inline
@@ -853,6 +866,14 @@ const atermpp::aterm_appl& default_value_StateNot()
   return t;
 }
 
+// StateMinus
+inline
+const atermpp::aterm_appl& default_value_StateMinus()
+{
+  static const atermpp::aterm_appl t = atermpp::aterm_appl(function_symbol_StateMinus(), default_value_StateFrm());
+  return t;
+}
+
 // StateAnd
 inline
 const atermpp::aterm_appl& default_value_StateAnd()
@@ -877,6 +898,30 @@ const atermpp::aterm_appl& default_value_StateImp()
   return t;
 }
 
+// StatePlus
+inline
+const atermpp::aterm_appl& default_value_StatePlus()
+{
+  static const atermpp::aterm_appl t = atermpp::aterm_appl(function_symbol_StatePlus(), default_value_StateFrm(), default_value_StateFrm());
+  return t;
+}
+
+// StateConstantMultiply
+inline
+const atermpp::aterm_appl& default_value_StateConstantMultiply()
+{
+  static const atermpp::aterm_appl t = atermpp::aterm_appl(function_symbol_StateConstantMultiply(), default_value_DataExpr(), default_value_StateFrm());
+  return t;
+}
+
+// StateConstantMultiplyAlt
+inline
+const atermpp::aterm_appl& default_value_StateConstantMultiplyAlt()
+{
+  static const atermpp::aterm_appl t = atermpp::aterm_appl(function_symbol_StateConstantMultiplyAlt(), default_value_StateFrm(), default_value_DataExpr());
+  return t;
+}
+
 // StateForall
 inline
 const atermpp::aterm_appl& default_value_StateForall()
@@ -890,6 +935,22 @@ inline
 const atermpp::aterm_appl& default_value_StateExists()
 {
   static const atermpp::aterm_appl t = atermpp::aterm_appl(function_symbol_StateExists(), default_value_List(default_value_DataVarId()), default_value_StateFrm());
+  return t;
+}
+
+// StateInfimum
+inline
+const atermpp::aterm_appl& default_value_StateInfimum()
+{
+  static const atermpp::aterm_appl t = atermpp::aterm_appl(function_symbol_StateInfimum(), default_value_List(default_value_DataVarId()), default_value_StateFrm());
+  return t;
+}
+
+// StateSupremum
+inline
+const atermpp::aterm_appl& default_value_StateSupremum()
+{
+  static const atermpp::aterm_appl t = atermpp::aterm_appl(function_symbol_StateSupremum(), default_value_List(default_value_DataVarId()), default_value_StateFrm());
   return t;
 }
 
@@ -1245,99 +1306,163 @@ const atermpp::aterm_appl& default_value_PropVarInst()
   return t;
 }
 
-// BES
+// PRES
 inline
-const atermpp::aterm_appl& default_value_BES()
+const atermpp::aterm_appl& default_value_PRES()
 {
-  static const atermpp::aterm_appl t = atermpp::aterm_appl(function_symbol_BES(), default_value_List(), default_value_BooleanExpression());
+  static const atermpp::aterm_appl t = atermpp::aterm_appl(function_symbol_PRES(), default_value_DataSpec(), default_value_GlobVarSpec(), default_value_PREqnSpec(), default_value_PRInit());
   return t;
 }
 
-// BooleanEquation
+// PREqnSpec
 inline
-const atermpp::aterm_appl& default_value_BooleanEquation()
+const atermpp::aterm_appl& default_value_PREqnSpec()
 {
-  static const atermpp::aterm_appl t = atermpp::aterm_appl(function_symbol_BooleanEquation(), default_value_FixPoint(), default_value_BooleanVariable(), default_value_BooleanExpression());
+  static const atermpp::aterm_appl t = atermpp::aterm_appl(function_symbol_PREqnSpec(), default_value_List());
   return t;
 }
 
-// BooleanVariable
+// PRInit
 inline
-const atermpp::aterm_appl& default_value_BooleanVariable()
+const atermpp::aterm_appl& default_value_PRInit()
 {
-  static const atermpp::aterm_appl t = atermpp::aterm_appl(function_symbol_BooleanVariable(), default_value_String());
+  static const atermpp::aterm_appl t = atermpp::aterm_appl(function_symbol_PRInit(), default_value_PropVarInst());
   return t;
 }
 
-// BooleanTrue
+// PREqn
 inline
-const atermpp::aterm_appl& default_value_BooleanTrue()
+const atermpp::aterm_appl& default_value_PREqn()
 {
-  static const atermpp::aterm_appl t = atermpp::aterm_appl(function_symbol_BooleanTrue());
+  static const atermpp::aterm_appl t = atermpp::aterm_appl(function_symbol_PREqn(), default_value_FixPoint(), default_value_PropVarDecl(), default_value_PRExpr());
   return t;
 }
 
-// BooleanFalse
+// PRESTrue
 inline
-const atermpp::aterm_appl& default_value_BooleanFalse()
+const atermpp::aterm_appl& default_value_PRESTrue()
 {
-  static const atermpp::aterm_appl t = atermpp::aterm_appl(function_symbol_BooleanFalse());
+  static const atermpp::aterm_appl t = atermpp::aterm_appl(function_symbol_PRESTrue());
   return t;
 }
 
-// BooleanNot
+// PRESFalse
 inline
-const atermpp::aterm_appl& default_value_BooleanNot()
+const atermpp::aterm_appl& default_value_PRESFalse()
 {
-  static const atermpp::aterm_appl t = atermpp::aterm_appl(function_symbol_BooleanNot(), default_value_BooleanExpression());
+  static const atermpp::aterm_appl t = atermpp::aterm_appl(function_symbol_PRESFalse());
   return t;
 }
 
-// BooleanAnd
+// PRESMinus
 inline
-const atermpp::aterm_appl& default_value_BooleanAnd()
+const atermpp::aterm_appl& default_value_PRESMinus()
 {
-  static const atermpp::aterm_appl t = atermpp::aterm_appl(function_symbol_BooleanAnd(), default_value_BooleanExpression(), default_value_BooleanExpression());
+  static const atermpp::aterm_appl t = atermpp::aterm_appl(function_symbol_PRESMinus(), default_value_PRExpr());
   return t;
 }
 
-// BooleanOr
+// PRESAnd
 inline
-const atermpp::aterm_appl& default_value_BooleanOr()
+const atermpp::aterm_appl& default_value_PRESAnd()
 {
-  static const atermpp::aterm_appl t = atermpp::aterm_appl(function_symbol_BooleanOr(), default_value_BooleanExpression(), default_value_BooleanExpression());
+  static const atermpp::aterm_appl t = atermpp::aterm_appl(function_symbol_PRESAnd(), default_value_PRExpr(), default_value_PRExpr());
   return t;
 }
 
-// BooleanImp
+// PRESOr
 inline
-const atermpp::aterm_appl& default_value_BooleanImp()
+const atermpp::aterm_appl& default_value_PRESOr()
 {
-  static const atermpp::aterm_appl t = atermpp::aterm_appl(function_symbol_BooleanImp(), default_value_BooleanExpression(), default_value_BooleanExpression());
+  static const atermpp::aterm_appl t = atermpp::aterm_appl(function_symbol_PRESOr(), default_value_PRExpr(), default_value_PRExpr());
   return t;
 }
 
-// BddTrue
+// PRESImp
 inline
-const atermpp::aterm_appl& default_value_BddTrue()
+const atermpp::aterm_appl& default_value_PRESImp()
 {
-  static const atermpp::aterm_appl t = atermpp::aterm_appl(function_symbol_BddTrue());
+  static const atermpp::aterm_appl t = atermpp::aterm_appl(function_symbol_PRESImp(), default_value_PRExpr(), default_value_PRExpr());
   return t;
 }
 
-// BddFalse
+// PRESPlus
 inline
-const atermpp::aterm_appl& default_value_BddFalse()
+const atermpp::aterm_appl& default_value_PRESPlus()
 {
-  static const atermpp::aterm_appl t = atermpp::aterm_appl(function_symbol_BddFalse());
+  static const atermpp::aterm_appl t = atermpp::aterm_appl(function_symbol_PRESPlus(), default_value_PRExpr(), default_value_PRExpr());
   return t;
 }
 
-// BddIf
+// PRESConstantMultiply
 inline
-const atermpp::aterm_appl& default_value_BddIf()
+const atermpp::aterm_appl& default_value_PRESConstantMultiply()
 {
-  static const atermpp::aterm_appl t = atermpp::aterm_appl(function_symbol_BddIf(), default_value_String(), default_value_BddExpression(), default_value_BddExpression());
+  static const atermpp::aterm_appl t = atermpp::aterm_appl(function_symbol_PRESConstantMultiply(), default_value_DataExpr(), default_value_PRExpr());
+  return t;
+}
+
+// PRESConstantMultiplyAlt
+inline
+const atermpp::aterm_appl& default_value_PRESConstantMultiplyAlt()
+{
+  static const atermpp::aterm_appl t = atermpp::aterm_appl(function_symbol_PRESConstantMultiplyAlt(), default_value_PRExpr(), default_value_DataExpr());
+  return t;
+}
+
+// PRESInfimum
+inline
+const atermpp::aterm_appl& default_value_PRESInfimum()
+{
+  static const atermpp::aterm_appl t = atermpp::aterm_appl(function_symbol_PRESInfimum(), default_value_List(default_value_DataVarId()), default_value_PRExpr());
+  return t;
+}
+
+// PRESSupremum
+inline
+const atermpp::aterm_appl& default_value_PRESSupremum()
+{
+  static const atermpp::aterm_appl t = atermpp::aterm_appl(function_symbol_PRESSupremum(), default_value_List(default_value_DataVarId()), default_value_PRExpr());
+  return t;
+}
+
+// PRESSum
+inline
+const atermpp::aterm_appl& default_value_PRESSum()
+{
+  static const atermpp::aterm_appl t = atermpp::aterm_appl(function_symbol_PRESSum(), default_value_List(default_value_DataVarId()), default_value_PRExpr());
+  return t;
+}
+
+// PRESEqInf
+inline
+const atermpp::aterm_appl& default_value_PRESEqInf()
+{
+  static const atermpp::aterm_appl t = atermpp::aterm_appl(function_symbol_PRESEqInf(), default_value_PRExpr());
+  return t;
+}
+
+// PRESEqNInf
+inline
+const atermpp::aterm_appl& default_value_PRESEqNInf()
+{
+  static const atermpp::aterm_appl t = atermpp::aterm_appl(function_symbol_PRESEqNInf(), default_value_PRExpr());
+  return t;
+}
+
+// PRESCondSm
+inline
+const atermpp::aterm_appl& default_value_PRESCondSm()
+{
+  static const atermpp::aterm_appl t = atermpp::aterm_appl(function_symbol_PRESCondSm(), default_value_PRExpr(), default_value_PRExpr(), default_value_PRExpr());
+  return t;
+}
+
+// PRESCondEq
+inline
+const atermpp::aterm_appl& default_value_PRESCondEq()
+{
+  static const atermpp::aterm_appl t = atermpp::aterm_appl(function_symbol_PRESCondEq(), default_value_PRExpr(), default_value_PRExpr(), default_value_PRExpr());
   return t;
 }
 
@@ -1453,18 +1578,11 @@ const atermpp::aterm_appl& default_value_PBExpr()
   return default_value_DataExpr();
 }
 
-// BooleanExpression
+// PRExpr
 inline
-const atermpp::aterm_appl& default_value_BooleanExpression()
+const atermpp::aterm_appl& default_value_PRExpr()
 {
-  return default_value_BooleanTrue();
-}
-
-// BddExpression
-inline
-const atermpp::aterm_appl& default_value_BddExpression()
-{
-  return default_value_BddTrue();
+  return default_value_DataExpr();
 }
 //--- end generated constructors ---//
 
@@ -1554,11 +1672,17 @@ static const atermpp::aterm_appl SortCons;
   static const atermpp::aterm_appl StateTrue;
   static const atermpp::aterm_appl StateFalse;
   static const atermpp::aterm_appl StateNot;
+  static const atermpp::aterm_appl StateMinus;
   static const atermpp::aterm_appl StateAnd;
   static const atermpp::aterm_appl StateOr;
   static const atermpp::aterm_appl StateImp;
+  static const atermpp::aterm_appl StatePlus;
+  static const atermpp::aterm_appl StateConstantMultiply;
+  static const atermpp::aterm_appl StateConstantMultiplyAlt;
   static const atermpp::aterm_appl StateForall;
   static const atermpp::aterm_appl StateExists;
+  static const atermpp::aterm_appl StateInfimum;
+  static const atermpp::aterm_appl StateSupremum;
   static const atermpp::aterm_appl StateMust;
   static const atermpp::aterm_appl StateMay;
   static const atermpp::aterm_appl StateYaled;
@@ -1603,18 +1727,26 @@ static const atermpp::aterm_appl SortCons;
   static const atermpp::aterm_appl PBESForall;
   static const atermpp::aterm_appl PBESExists;
   static const atermpp::aterm_appl PropVarInst;
-  static const atermpp::aterm_appl BES;
-  static const atermpp::aterm_appl BooleanEquation;
-  static const atermpp::aterm_appl BooleanVariable;
-  static const atermpp::aterm_appl BooleanTrue;
-  static const atermpp::aterm_appl BooleanFalse;
-  static const atermpp::aterm_appl BooleanNot;
-  static const atermpp::aterm_appl BooleanAnd;
-  static const atermpp::aterm_appl BooleanOr;
-  static const atermpp::aterm_appl BooleanImp;
-  static const atermpp::aterm_appl BddTrue;
-  static const atermpp::aterm_appl BddFalse;
-  static const atermpp::aterm_appl BddIf;
+  static const atermpp::aterm_appl PRES;
+  static const atermpp::aterm_appl PREqnSpec;
+  static const atermpp::aterm_appl PRInit;
+  static const atermpp::aterm_appl PREqn;
+  static const atermpp::aterm_appl PRESTrue;
+  static const atermpp::aterm_appl PRESFalse;
+  static const atermpp::aterm_appl PRESMinus;
+  static const atermpp::aterm_appl PRESAnd;
+  static const atermpp::aterm_appl PRESOr;
+  static const atermpp::aterm_appl PRESImp;
+  static const atermpp::aterm_appl PRESPlus;
+  static const atermpp::aterm_appl PRESConstantMultiply;
+  static const atermpp::aterm_appl PRESConstantMultiplyAlt;
+  static const atermpp::aterm_appl PRESInfimum;
+  static const atermpp::aterm_appl PRESSupremum;
+  static const atermpp::aterm_appl PRESSum;
+  static const atermpp::aterm_appl PRESEqInf;
+  static const atermpp::aterm_appl PRESEqNInf;
+  static const atermpp::aterm_appl PRESCondSm;
+  static const atermpp::aterm_appl PRESCondEq;
   static const atermpp::aterm_appl SortExpr;
   static const atermpp::aterm_appl SortConsType;
   static const atermpp::aterm_appl DataExpr;
@@ -1631,8 +1763,7 @@ static const atermpp::aterm_appl SortCons;
   static const atermpp::aterm_appl ActionRenameRuleRHS;
   static const atermpp::aterm_appl FixPoint;
   static const atermpp::aterm_appl PBExpr;
-  static const atermpp::aterm_appl BooleanExpression;
-  static const atermpp::aterm_appl BddExpression;
+  static const atermpp::aterm_appl PRExpr;
 //--- end generated variables ---//
 };
 

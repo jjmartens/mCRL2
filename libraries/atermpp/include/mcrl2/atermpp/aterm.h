@@ -24,6 +24,12 @@ typedef void(*term_callback)(const aterm&);
 
 extern void add_deletion_hook(const function_symbol&, term_callback);
 
+// Forward declaration
+namespace detail
+{
+  class thread_aterm_pool;
+}
+
 /// \brief An unprotected term does not change the reference count of the
 ///        shared term when it is copied or moved.
 class unprotected_aterm
@@ -214,9 +220,7 @@ public:
   //          which is as it stands relatively expensive. The effect is equal to the assignment operator =. 
   /// \param other The aterm that will be assigned.
   aterm& assign(const aterm& other,
-                std::atomic<bool>* busy_flag,
-                std::atomic<bool>* forbidden_flag,
-                std::size_t* lock_depth) noexcept;
+                detail::thread_aterm_pool& pool) noexcept;
 
   /// \brief Assignment operator, to be used when the busy flags do not need to be set.
   /// \details This is only safe in the parallel context when the busy flag is already
@@ -231,41 +235,6 @@ public:
   /// \param other The aterm that will be assigned.
   /// \return A reference to the assigned term.
   aterm& operator=(aterm&& other) noexcept;
-
-#ifdef MCRL2_ATERMPP_REFERENCE_COUNTED
-  /// \brief Obtain the reference count of this term.
-  /// \detail This function is only intended for low level inspection of terms. 
-  /// \return The current reference count of this term.
-  std::size_t reference_count() const
-  {
-    return m_term->reference_count();
-  }
-#endif
-
-protected:
-#ifdef MCRL2_ATERMPP_REFERENCE_COUNTED
-  /// \brief Increment the reference count.
-  /// \details This increments the reference count unless the term contains null.
-  ///          Use with care as this destroys the reference count mechanism.
-  void increment_reference_count() const
-  {
-    if (defined())
-    {
-      m_term->increment_reference_count();
-    }
-  }
-
-  /// \brief Decrement the reference count.
-  /// \details This decrements the reference count unless the term contains null.
-  ///          Use with care as this destroys the reference count mechanism.
-  void decrement_reference_count() const
-  {
-    if (defined())
-    {
-      m_term->decrement_reference_count();
-    }
-  }
-#endif
 };
 
 template <class Term1, class Term2>
@@ -304,7 +273,7 @@ const Derived& down_cast(const Base& t,
 template <class Derived, class Base>
 Derived& reference_cast(Base& t,
                         typename std::enable_if<is_convertible<Base, Derived>::value &&
-                                                !std::is_base_of<Derived, Base>::value>::type* = nullptr)
+                                                !std::is_base_of<Derived, Base>::value >::type* = nullptr)
 {
   static_assert(sizeof(Base) == sizeof(aterm), 
                 "aterm cast can only be applied to terms directly derived from aterms");
@@ -312,6 +281,20 @@ Derived& reference_cast(Base& t,
                 "aterm cast can only be applied to types derived from aterms where no extra fields are added");
   // We do not check types as the content of the term t is likely to be overwritten shortly. 
   return reinterpret_cast<Derived&>(t);
+}
+
+/// \brief A cast from one aterm based type to another, as a reference, allowing to assign to it.
+//         This can be useful when assigning to a term type that contains the derived term type. 
+//         In case Derived and Base are equal, nothing needs to be done. 
+/// \param   t A term of a type inheriting from an aterm.
+/// \return  A term of type Derived&.
+template <class Derived>
+Derived& reference_cast(Derived& t)
+{
+  static_assert(sizeof(Derived) == sizeof(aterm), 
+                "aterm cast can only be applied to terms directly derived from aterms");
+  // We do not check types as the content of the term t is likely to be overwritten shortly. 
+  return t;
 }
 
 template < typename DerivedCont, typename Base, template <typename Elem> class Cont >

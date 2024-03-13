@@ -13,6 +13,8 @@
 #include "mcrl2/atermpp/detail/aterm_pool_storage.h"
 #include "mcrl2/atermpp/detail/function_symbol_pool.h"
 
+#include "mcrl2/utilities/shared_mutex.h"
+
 namespace atermpp
 {
 namespace detail
@@ -29,30 +31,40 @@ using arbitrary_function_application_storage = aterm_pool_storage<_aterm_appl<1>
 template<std::size_t N>
 using function_application_storage = aterm_pool_storage<_aterm_appl<N>, aterm_hasher_finite<N>, aterm_equals_finite<N>, N>;
 
+// There are some annoying circular dependencies between a aterm_pool and the contained thread_aterm_pool_interfaces
+class aterm_pool;
+
 /// \brief A thread specific aterm pool that provides a local interface to the global term pool.
 ///        Ensures that terms created by this thread are protected during garbage collection.
-class thread_aterm_pool_interface
+class thread_aterm_pool_interface final
 {
 public:
-  virtual ~thread_aterm_pool_interface() {}
+  thread_aterm_pool_interface(aterm_pool& pool, std::function<void()> mark_function, std::function<void()> print_function, std::function<std::size_t()> protection_set_size_function);
+  ~thread_aterm_pool_interface();
 
   /// \brief Mark the terms created by this thread to prevent them being garbage collected.
-  virtual void mark() = 0;
+  void mark()
+  {
+    m_mark_function();
+  }
 
   /// \brief Print performance statistics for data stored for this thread.
-  virtual void print_local_performance_statistics() const = 0;
-
-  /// \brief Blocks until the thread pool is not busy.
-  virtual void wait_for_busy() const = 0;
-
-  /// \returns True iff the thread aterm pool has its busy flag set. 
-  virtual bool is_busy() const = 0;
-
-  /// \brief Sets the forbidden flag.
-  virtual void set_forbidden(bool value) = 0;
+  void print_local_performance_statistics() const
+  {
+    m_print_function();
+  }
 
   /// \returns The total number of terms residing in the pool.
-  virtual std::size_t protection_set_size() const = 0;
+  std::size_t protection_set_size() const 
+  {
+    return m_protection_set_size_function();
+  }
+
+private:
+  aterm_pool& m_pool;
+  std::function<void()> m_mark_function;
+  std::function<void()> m_print_function;
+  std::function<std::size_t()> m_protection_set_size_function;
 };
 
 class thread_aterm_pool;
@@ -78,16 +90,12 @@ public:
   /// \see function_symbol_pool.
   inline function_symbol create_function_symbol(std::string&& name, const std::size_t arity, const bool check_for_registered_functions = false);
 
-  /// \brief Force garbage collection on all storages.
-  /// \threadsafe
-  inline void collect();
-
   /// \brief Register a thread specific aterm pool.
-  /// \threadsafe
+  /// \details threadsafe
   inline void register_thread_aterm_pool(thread_aterm_pool_interface& pool);
 
   /// \brief Remove thread specific aterm pool.
-  /// \threadsafe
+  /// \details threadsafe
   inline void remove_thread_aterm_pool(thread_aterm_pool_interface& pool);
 
   /// \brief The number of terms that can be stored without resizing.
@@ -121,16 +129,19 @@ public:
 
   // These functions of the aterm pool should be called through a thread_aterm_pool.
 private:
+  /// \brief Force garbage collection on all storages.
+  /// \details threadsafe
+  inline void collect(mcrl2::utilities::shared_mutex& mutex);
 
   /// \brief Triggers garbage collection and resizing when conditions are met.
   /// \param allow_collect Actually perform the garbage collection instead of only updating the counters.
-  /// \param thread The pool that called this function.
-  /// \threadsafe
-  inline void created_term(bool allow_collect, thread_aterm_pool_interface* thread);
+  /// \param mutex The shared mutex that should be used for locking if necessary.
+  /// \details threadsafe
+  inline void created_term(bool allow_collect, mcrl2::utilities::shared_mutex& mutex);
 
   /// \brief Collect garbage on all storages.
-  /// \threadsafe
-  inline void collect_impl(thread_aterm_pool_interface* thread);
+  /// \details threadsafe
+  inline void collect_impl(mcrl2::utilities::shared_mutex& mutex);
 
   /// \brief Creates a integral term with the given value.
   inline bool create_int(aterm& term, std::size_t val);
@@ -162,26 +173,16 @@ private:
       InputIterator end);
 
   /// \brief Resizes all storages if necessary.
-  /// \threadsafe.
-  inline void resize_if_needed(thread_aterm_pool_interface* thread);
+  /// \details threadsafe
+  inline void resize_if_needed(mcrl2::utilities::shared_mutex& shared);
+
+  mcrl2::utilities::shared_mutex& shared_mutex() { return m_shared_mutex; }
 
   /// \returns The total number of term variables residing in the protection sets.
   inline std::size_t protection_set_size() const;
 
-  /// \returns Wait for the mutex to unlock.
-  inline void wait();
-
-  /// \brief Prevent any other thread aterm pool from creating or retrieving terms.
-  inline void lock(thread_aterm_pool_interface* thread);
-
-  /// \brief Allow all thread pools to resume their threads.
-  inline void unlock();
-
   /// \brief The set of local aterm pools.
   std::vector<thread_aterm_pool_interface* > m_thread_pools;
-
-  /// \brief Mutex for adding/removing local pools in m_thread_pools.
-  std::mutex m_mutex;
 
   /// \brief Storage for the function symbols.
   function_symbol_pool m_function_symbol_pool;
@@ -210,9 +211,25 @@ private:
 
   std::atomic<bool> m_enable_garbage_collection = EnableGarbageCollection; /// Garbage collection is enabled.
 
+  /// All the shared mutexes.
+  mcrl2::utilities::shared_mutex m_shared_mutex;
+
   /// Represents an empty list.
   aterm m_empty_list;
 };
+
+inline
+thread_aterm_pool_interface::thread_aterm_pool_interface(aterm_pool& pool, std::function<void()> mark_function, std::function<void()> print_function, std::function<std::size_t()> protection_set_size_function)
+  : m_pool(pool), m_mark_function(mark_function), m_print_function(print_function), m_protection_set_size_function(protection_set_size_function)
+{
+  m_pool.register_thread_aterm_pool(*this);
+}
+
+inline
+thread_aterm_pool_interface::~thread_aterm_pool_interface()
+{
+  m_pool.remove_thread_aterm_pool(*this);
+}
 
 } // namespace detail
 } // namespace atermpp

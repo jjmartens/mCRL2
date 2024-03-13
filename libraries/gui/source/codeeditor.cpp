@@ -18,7 +18,7 @@
 
 using namespace mcrl2::gui::qt;
 
-HighlightingRule::HighlightingRule(QRegExp pattern, QTextCharFormat format)
+HighlightingRule::HighlightingRule(QRegularExpression pattern, QTextCharFormat format)
     : pattern(pattern), format(format)
 {
 }
@@ -29,7 +29,7 @@ CodeHighlighter::CodeHighlighter(bool spec, bool light, QTextDocument* parent)
   /* identifiers */
   identifierFormat.setForeground(light ? Qt::black : Qt::white);
   highlightingRules.push_back(HighlightingRule(
-      QRegExp("\\b[a-zA-Z_][a-zA-Z0-9_']*\\b"), identifierFormat));
+    QRegularExpression("\\b[a-zA-Z_][a-zA-Z0-9_']*\\b"), identifierFormat));
 
   /* in case of mcrl2 specification */
   if (spec)
@@ -43,7 +43,7 @@ CodeHighlighter::CodeHighlighter(bool spec, bool light, QTextDocument* parent)
     for (const QString& pattern : specificationKeywordPatterns)
     {
       highlightingRules.push_back(
-          HighlightingRule(QRegExp(pattern), specificationKeywordFormat));
+          HighlightingRule(QRegularExpression(pattern), specificationKeywordFormat));
     }
 
     /* process keywords */
@@ -52,7 +52,7 @@ CodeHighlighter::CodeHighlighter(bool spec, bool light, QTextDocument* parent)
     for (const QString& pattern : processKeywordPatterns)
     {
       highlightingRules.push_back(
-          HighlightingRule(QRegExp(pattern), processKeywordFormat));
+          HighlightingRule(QRegularExpression(pattern), processKeywordFormat));
     }
 
     /* process operator keywords */
@@ -64,7 +64,7 @@ CodeHighlighter::CodeHighlighter(bool spec, bool light, QTextDocument* parent)
     for (const QString& pattern : processOperatorKeywordPatterns)
     {
       highlightingRules.push_back(
-          HighlightingRule(QRegExp(pattern), processOperatorKeywordFormat));
+          HighlightingRule(QRegularExpression(pattern), processOperatorKeywordFormat));
     }
   }
   /* in case of mcf formula */
@@ -78,7 +78,7 @@ CodeHighlighter::CodeHighlighter(bool spec, bool light, QTextDocument* parent)
     for (const QString& pattern : processOperatorKeywordPatterns)
     {
       highlightingRules.push_back(
-          HighlightingRule(QRegExp(pattern), stateFormulaOpertorKeywordFormat));
+          HighlightingRule(QRegularExpression(pattern), stateFormulaOpertorKeywordFormat));
     }
   }
 
@@ -92,7 +92,7 @@ CodeHighlighter::CodeHighlighter(bool spec, bool light, QTextDocument* parent)
   for (const QString& pattern : primitiveTypeKeywordPatterns)
   {
     highlightingRules.push_back(
-        HighlightingRule(QRegExp(pattern), primitiveTypeKeywordFormat));
+        HighlightingRule(QRegularExpression(pattern), primitiveTypeKeywordFormat));
   }
 
   /* container type keywords */
@@ -102,7 +102,7 @@ CodeHighlighter::CodeHighlighter(bool spec, bool light, QTextDocument* parent)
   for (const QString& pattern : containerTypeKeywordPatterns)
   {
     highlightingRules.push_back(
-        HighlightingRule(QRegExp(pattern), containerTypeKeywordFormat));
+        HighlightingRule(QRegularExpression(pattern), containerTypeKeywordFormat));
   }
 
   /* data keywords */
@@ -111,7 +111,7 @@ CodeHighlighter::CodeHighlighter(bool spec, bool light, QTextDocument* parent)
   for (const QString& pattern : dataKeywordPatterns)
   {
     highlightingRules.push_back(
-        HighlightingRule(QRegExp(pattern), dataKeywordFormat));
+        HighlightingRule(QRegularExpression(pattern), dataKeywordFormat));
   }
 
   /* data operator keywords */
@@ -122,7 +122,7 @@ CodeHighlighter::CodeHighlighter(bool spec, bool light, QTextDocument* parent)
   for (const QString& pattern : dataOperatorKeywordPatterns)
   {
     highlightingRules.push_back(
-        HighlightingRule(QRegExp(pattern), dataOperatorKeywordFormat));
+        HighlightingRule(QRegularExpression(pattern), dataOperatorKeywordFormat));
   }
 
   /* to do keywords */
@@ -132,7 +132,7 @@ CodeHighlighter::CodeHighlighter(bool spec, bool light, QTextDocument* parent)
   for (const QString& pattern : todoKeywordPatterns)
   {
     highlightingRules.push_back(
-        HighlightingRule(QRegExp(pattern), todoKeywordFormat));
+        HighlightingRule(QRegularExpression(pattern), todoKeywordFormat));
   }
 
   /* defined function keywords */
@@ -146,39 +146,35 @@ CodeHighlighter::CodeHighlighter(bool spec, bool light, QTextDocument* parent)
   for (const QString& pattern : functionKeywordPatterns)
   {
     highlightingRules.push_back(
-        HighlightingRule(QRegExp(pattern), functionKeywordFormat));
+        HighlightingRule(QRegularExpression(pattern), functionKeywordFormat));
   }
 
   /* operators */
   operatorFormat.setForeground(light ? Qt::darkGreen : Qt::green);
   highlightingRules.push_back(HighlightingRule(
-      QRegExp("[\\.\\+|&<>:;=@(){}\\[\\],\\!\\*/\\\\-]"), operatorFormat));
+    QRegularExpression("[\\.\\+|&<>:;=@(){}\\[\\],\\!\\*/\\\\-]"), operatorFormat));
   highlightingRules.push_back(
-      HighlightingRule(QRegExp("\\|\\|_"), operatorFormat));
-  highlightingRules.push_back(HighlightingRule(QRegExp("->"), operatorFormat));
+      HighlightingRule(QRegularExpression("\\|\\|_"), operatorFormat));
+  highlightingRules.push_back(HighlightingRule(QRegularExpression("->"), operatorFormat));
 
   /* numbers */
   numberFormat.setForeground(light ? Qt::darkGreen : Qt::green);
   highlightingRules.push_back(
-      HighlightingRule(QRegExp("\\b[0-9]+\\b"), numberFormat));
+      HighlightingRule(QRegularExpression("\\b[0-9]+\\b"), numberFormat));
 
   /* single line comments */
   commentFormat.setForeground(light ? Qt::darkGray : Qt::lightGray);
   highlightingRules.push_back(
-      HighlightingRule(QRegExp("%[^\n]*"), commentFormat));
+      HighlightingRule(QRegularExpression("%[^\n]*"), commentFormat));
 }
 
 void CodeHighlighter::highlightBlock(const QString& text)
 {
   for (const HighlightingRule& rule : highlightingRules)
   {
-    QRegExp expression(rule.pattern);
-    int index = expression.indexIn(text);
-    while (index >= 0)
-    {
-      int length = expression.matchedLength();
-      setFormat(index, length, rule.format);
-      index = expression.indexIn(text, index + length);
+    for (const auto& match : rule.pattern.globalMatch(text))
+    {      
+      setFormat(match.capturedStart(), match.capturedEnd() - match.capturedStart(), rule.format);
     }
   }
 }
@@ -248,10 +244,20 @@ void CodeEditor::setFontSize(int pixelSize)
   codeFont.setPixelSize(pixelSize);
   this->setFont(codeFont);
   lineNumberFont.setPixelSize(pixelSize);
+  
+  int big_number = 1000; // arbitrary big number.
+  const QString test_string(" ");
 
-  /* set the tab width to 4 characters */
+  // compute the size of a char in double-precision, needed because maxWidth and
+  // averageCharWidth only return integer values. However, the width of a monospaced
+  // character apparently does not have to be an exact pixel width. Various attempts with
+  // setStrategy and the like did not yield satisfying results.
   QFontMetrics codeFontMetrics = QFontMetrics(codeFont);
-  this->setTabStopDistance(codeFontMetrics.averageCharWidth() * 4);
+  const int many_char_width = codeFontMetrics.horizontalAdvance(test_string.repeated(big_number));
+  const double single_char_width_double = many_char_width / double(big_number);
+
+  // set the tab width to 4 characters
+  this->setTabStopDistance(single_char_width_double * 4);
 }
 
 void CodeEditor::changeHighlightingRules()

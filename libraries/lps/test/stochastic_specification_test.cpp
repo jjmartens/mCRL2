@@ -141,6 +141,77 @@ BOOST_AUTO_TEST_CASE(test_multiple_stochastic_parameters)
   BOOST_CHECK_EQUAL(lps::pp(spec),result);
 }  
 
+// This test checks whether a parameter in a stochastic operator are translated 
+// correctely.
+BOOST_AUTO_TEST_CASE(test_properly_change_bound_variables)
+{
+  std::string text =
+    "map distribution: Bool#Pos#Pos->Real;\n"
+    "\n"
+    "act win, lose;\n"
+    "    hold:Bool;\n"
+    "\n"
+    "proc Play(round_: Nat, hold3:Bool, r3: Pos) = \n"
+    "       dist s3:Pos[distribution(hold3, r3, s3)].\n"
+    "         (\n"
+    "            (round_==1) -> lose.delta\n"
+    "                        <>  sum b3: Bool. hold(b3).Play(round_+1, b3, s3 )\n"
+    "        );\n"
+    "\n"
+    "init Play(0, false, 1);\n"
+;
+
+  std::string result1 =
+    "map  distribution: Bool # Pos # Pos -> Real;\n"
+    "\n"
+    "act  win,lose;\n"
+    "     hold: Bool;\n"
+    "\n"
+    "glob dc: Pos;\n"
+    "     dc1: Nat;\n"
+    "\n"
+    "proc P(s4_Play,s1_Play: Pos, round__Play: Nat) =\n"
+    "       sum b1_Play: Bool.\n"
+    "         (s4_Play == 2 && !(round__Play == 1)) ->\n"
+    "         hold(b1_Play) .\n"
+    "         dist s2_Play: Pos[distribution(b1_Play, s1_Play, s2_Play)] .\n"
+    "         P(s4_Play = 2, s1_Play = s2_Play, round__Play = round__Play + 1)\n"
+    "     + (s4_Play == 2 && round__Play == 1) ->\n"
+    "         lose .\n"
+    "         P(s4_Play = 1, s1_Play = dc, round__Play = dc1)\n"
+    "     + delta;\n"
+    "\n"
+    "init dist s1: Pos[distribution(false, 1, s1)] . P(2, s1, 0);\n"
+    ;
+
+  std::string result2 =
+    "map  distribution: Bool # Pos # Pos -> Real;\n"
+    "\n"
+    "act  win,lose;\n"
+    "     hold: Bool;\n"
+    "\n"
+    "glob dc: Pos;\n"
+    "     dc1: Nat;\n"
+    "\n"
+    "proc P(s4_Play,s1_Play: Pos, round__Play: Nat) =\n"
+    "       sum b1_Play: Bool.\n"
+    "         (s4_Play == 1 && !(round__Play == 1)) ->\n"
+    "         hold(b1_Play) .\n"
+    "         dist s2_Play: Pos[distribution(b1_Play, s1_Play, s2_Play)] .\n"
+    "         P(s4_Play = 1, s1_Play = s2_Play, round__Play = round__Play + 1)\n"
+    "     + (s4_Play == 1 && round__Play == 1) ->\n"
+    "         lose .\n"
+    "         P(s4_Play = 2, s1_Play = dc, round__Play = dc1)\n"
+    "     + delta;\n"
+    "\n"
+    "init dist s1: Pos[distribution(false, 1, s1)] . P(1, s1, 0);\n"
+    ;
+
+  stochastic_specification spec=linearise(text);
+  BOOST_CHECK(lps::pp(spec)==result1 ||   // The lineariser can up with multiple results, depending on how terms are stored internally. 
+              lps::pp(spec)==result2);
+}  
+
 // This test checks whether the outward distribution of dist operators is going 
 // correctely.
 BOOST_AUTO_TEST_CASE(test_push_dist_outward)
@@ -217,6 +288,7 @@ BOOST_AUTO_TEST_CASE(distributed_sum_over_dist2)
   stochastic_specification spec=linearise(text);
   BOOST_CHECK(lps::detail::is_well_typed(spec));
 }
+
 /* The following example shows an initial distribution with variables
  * that are not used in the body. */
 BOOST_AUTO_TEST_CASE(non_bound_initial_stochastic_variables)
@@ -230,4 +302,26 @@ BOOST_AUTO_TEST_CASE(non_bound_initial_stochastic_variables)
   stochastic_specification spec=linearise(text);
   BOOST_CHECK(lps::detail::is_well_typed(spec));
 }
+
+/* The following example was not linearised correctly, as
+   an expression sum x:D.a.P was returned
+   unchanged when P had an initial distribution. 
+ */
+BOOST_AUTO_TEST_CASE(distribution_insided_sum_bug)
+{
+  std::string text =
+    "act a,b;\n"
+    "\n"
+    "proc Environment = \n"
+    "        sum realReading: Nat . (realReading<2) ->\n"
+    "            a . EnvironmentSensorProcess;\n"
+    "\n"
+    "proc EnvironmentSensorProcess =\n"
+    "        dist f:Bool[if(f, 1/4, 3/4)].f->b.delta;\n"
+    "\n"
+    "init Environment;\n";
+  stochastic_specification spec=linearise(text);
+  BOOST_CHECK(lps::detail::is_well_typed(spec));
+}
+
 

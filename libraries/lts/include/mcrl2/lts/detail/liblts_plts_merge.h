@@ -138,15 +138,22 @@ void plts_merge(LTS_TYPE& l1, const LTS_TYPE& l2)
   const std::size_t n_prob_states_l2 = l2.num_probabilistic_states();
   for (std::size_t i = 0; i < n_prob_states_l2; ++i)
   {
-    typename LTS_TYPE::probabilistic_state_t new_prob_states;
+    typename LTS_TYPE::probabilistic_state_t new_prob_state;
     const typename LTS_TYPE::probabilistic_state_t& old_prob_state = l2.probabilistic_state(i);
 
-    for (const typename LTS_TYPE::probabilistic_state_t::state_probability_pair& sp_pair : old_prob_state)
+    if (old_prob_state.size()>1)
     {
-      new_prob_states.add(sp_pair.state()+ old_nstates, sp_pair.probability());
-    }
+      for (const typename LTS_TYPE::probabilistic_state_t::state_probability_pair& sp_pair : old_prob_state)
+      {
+        new_prob_state.add(sp_pair.state()+ old_nstates, sp_pair.probability());
+      }
 
-    l1.add_probabilistic_state(new_prob_states);
+    }
+    else
+    {
+      new_prob_state.set(old_prob_state.get()+old_nstates);
+    }
+    l1.add_probabilistic_state(new_prob_state);
   }
 
   // Add the initial probabilistic state of both plts at the end of the merged plts.
@@ -154,13 +161,19 @@ void plts_merge(LTS_TYPE& l1, const LTS_TYPE& l2)
   l1.add_probabilistic_state(l1.initial_probabilistic_state());
 
   // Then add the initia probabilistic state of l2
-  typename LTS_TYPE::probabilistic_state_t new_initial_prob_states_l2;
-  const typename LTS_TYPE::probabilistic_state_t& old_inital_prob_state = l2.initial_probabilistic_state();
-  for (const typename LTS_TYPE::probabilistic_state_t::state_probability_pair& sp_pair : old_inital_prob_state)
+  typename LTS_TYPE::probabilistic_state_t new_initial_prob_state_l2;
+  if (l2.initial_probabilistic_state().size()<=1)
   {
-    new_initial_prob_states_l2.add(sp_pair.state() + old_nstates, sp_pair.probability());
+    new_initial_prob_state_l2.set(l2.initial_probabilistic_state().get() + old_nstates);
   }
-  l1.add_probabilistic_state(new_initial_prob_states_l2);
+  else // If the initial state is a distribution with more than one state.
+  {
+    for (const typename LTS_TYPE::probabilistic_state_t::state_probability_pair& sp_pair : l2.initial_probabilistic_state())
+    {
+      new_initial_prob_state_l2.add(sp_pair.state() + old_nstates, sp_pair.probability());
+    }
+  }
+  l1.add_probabilistic_state(new_initial_prob_state_l2);
 }
 } // namespace detail
 } // namespace lts

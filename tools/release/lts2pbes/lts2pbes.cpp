@@ -12,15 +12,15 @@
 #define TOOLNAME "lts2pbes"
 #define AUTHOR "Wieger Wesselink"
 
-#include "mcrl2/bes/pbes_output_tool.h"
+#include "mcrl2/utilities/input_output_tool.h"
 #include "mcrl2/lts/detail/lts_load.h"
 #include "mcrl2/modal_formula/parse.h"
 #include "mcrl2/pbes/lts2pbes.h"
-#include "mcrl2/utilities/input_output_tool.h"
+#include "mcrl2/pbes/pbes_output_tool.h"
 
 using namespace mcrl2;
 using namespace mcrl2::utilities;
-using bes::tools::pbes_output_tool;
+using pbes_system::tools::pbes_output_tool;
 using utilities::tools::input_output_tool;
 
 inline
@@ -126,13 +126,14 @@ class lts2pbes_tool : public pbes_output_tool<input_output_tool>
   public:
     bool run() override
     {
-      lps::specification lpsspec = lts::detail::extract_specification(ltsspec);
+      lps::stochastic_specification lpsspec = lts::detail::extract_specification(ltsspec);
       std::ifstream from(formfilename.c_str());
       if (!from)
       {
         throw mcrl2::runtime_error("Cannot open state formula file: " + formfilename + ".");
       }
-      state_formulas::state_formula_specification formspec = state_formulas::parse_state_formula_specification(from, lpsspec);
+      const bool formula_is_quantitative = false;
+      state_formulas::state_formula_specification formspec = state_formulas::parse_state_formula_specification(from, lpsspec, formula_is_quantitative);
       check_lts2pbes_actions(formspec.formula(), ltsspec);
       from.close();
       lpsspec.data() = data::merge_data_specifications(lpsspec.data(), formspec.data());

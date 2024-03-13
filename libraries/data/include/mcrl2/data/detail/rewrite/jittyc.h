@@ -8,8 +8,8 @@
 //
 /// \file mcrl2/data/detail/rewrite/jittyc.h
 
-#ifndef __REWR_JITTYC_H
-#define __REWR_JITTYC_H
+#ifndef MCRL2_DATA_DETAIL_REWR_JITTYC_H
+#define MCRL2_DATA_DETAIL_REWR_JITTYC_H
 
 #include <utility>
 #include <string>
@@ -22,7 +22,7 @@
 #include "mcrl2/data/detail/rewrite/nfs_array.h"
 #include "mcrl2/data/substitutions/mutable_map_substitution.h"
 
-#ifdef MCRL2_JITTYC_AVAILABLE
+#ifdef MCRL2_ENABLE_JITTYC
 
 namespace mcrl2
 {
@@ -170,9 +170,7 @@ class RewriterCompilingJitty: public Rewriter
     // is relatively slow. It is expected that in some future version of the compiler
     // such access is faster, and no copy of these flags is needed anymore. 
   public:
-    std::atomic<bool>* m_busy_flag = nullptr;
-    std::atomic<bool>* m_forbidden_flag = nullptr;
-    std::size_t* m_lock_depth = nullptr;
+    atermpp::detail::thread_aterm_pool* m_thread_aterm_pool;
 
   protected:
     // Copy construction. Not (yet) for public use.
@@ -206,9 +204,7 @@ class RewriterCompilingJitty: public Rewriter
   void thread_initialise()
   {
     mCRL2log(mcrl2::log::debug) << "Initialise busy/forbidden flags\n";
-    m_busy_flag = atermpp::detail::g_thread_term_pool().get_busy_flag();
-    m_forbidden_flag = atermpp::detail::g_thread_term_pool().get_forbidden_flag();
-    m_lock_depth = atermpp::detail::g_thread_term_pool().get_lock_depth();
+    m_thread_aterm_pool = &atermpp::detail::g_thread_term_pool();
   }
 };
 
@@ -225,6 +221,6 @@ struct rewriter_interface
 }
 }
 
-#endif // MCRL2_JITTYC_AVAILABLE
+#endif // MCRL2_ENABLE_JITTYC
 
-#endif // __REWR_JITTYC_H
+#endif // MCRL2_DATA_DETAIL_REWR_JITTYC_H

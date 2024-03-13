@@ -213,7 +213,10 @@ parse_node parser::parse(const std::string& text, unsigned int start_symbol_inde
   m_parser->partial_parses = partial_parses ? 1 : 0;
   D_ParseNode* result = dparse(m_parser, const_cast<char*>(text.c_str()), static_cast<int>(text.size()));
   if (!result || m_parser->syntax_errors)
-  {
+  {    
+    if (result != nullptr) {
+      free_D_ParseNode(m_parser, result);
+    }
     throw mcrl2::runtime_error("syntax error");
   }
   return parse_node(result, m_parser);
@@ -309,12 +312,12 @@ bool is_all_of_type(D_ParseNode* nodes[], int n, const char* type, const core::p
 inline
 void print_ambiguous_nodes(D_ParseNode* nodes[], int n, const char* type, const core::parser_table& table)
 {
-  mCRL2log(log::verbose, "parser") << "--- " << type << " ambiguity" << std::endl;
+  mCRL2log(log::verbose) << "--- " << type << " ambiguity" << std::endl;
   for (int i = 0; i < n; ++i)
   {
     core::parse_node vi(nodes[i]);
-    // mCRL2log(log::verbose, "parser") << vi.tree() << " " << table.tree(vi) << std::endl;
-    mCRL2log(log::verbose, "parser") << "ALT " << table.tree(vi) << std::endl;
+    // mCRL2log(log::verbose) << vi.tree() << " " << table.tree(vi) << std::endl;
+    mCRL2log(log::verbose) << "ALT " << table.tree(vi) << std::endl;
   }
 }
 
@@ -322,7 +325,7 @@ inline
 void print_chosen_node(D_ParseNode* node, const core::parser_table& table)
 {
   core::parse_node vi(node);
-  mCRL2log(log::verbose, "parser") << "CHOOSE " << table.tree(vi) << std::endl;
+  mCRL2log(log::verbose) << "CHOOSE " << table.tree(vi) << std::endl;
 }
 
 /// \brief Function for resolving parser ambiguities.
@@ -427,8 +430,8 @@ D_ParseNode* ambiguity_fn(struct D_Parser * /*p*/, int n, struct D_ParseNode **v
   for (int i = 0; i < n; ++i)
   {
     core::parse_node vi(v[i]);
-    mCRL2log(log::verbose, "parser") << "Ambiguity: " << vi.tree() << std::endl;
-    mCRL2log(log::debug, "parser") << "Ambiguity: " << table.tree(vi) << std::endl;
+    mCRL2log(log::verbose) << "Ambiguity: " << vi.tree() << std::endl;
+    mCRL2log(log::debug) << "Ambiguity: " << table.tree(vi) << std::endl;
   }
   throw mcrl2::runtime_error("Unresolved ambiguity.");
 }
@@ -454,7 +457,7 @@ static void log_location(struct D_Parser *ap)
   {
     message = message + " after '" + after + "'";
   }
-  mCRL2log(log::error, "parser") << add_context(&ap->loc, message) << std::endl;
+  mCRL2log(log::error) << add_context(&ap->loc, message) << std::endl;
 }
 
 void syntax_error_fn(struct D_Parser *ap)
@@ -467,7 +470,7 @@ void syntax_error_fn(struct D_Parser *ap)
   log_location(ap);
   if (ap->loc.s == nullptr)
   {
-    mCRL2log(log::error, "parser") << "Unexpected end of input." << std::endl;
+    mCRL2log(log::error) << "Unexpected end of input." << std::endl;
   }
   else
   {
@@ -492,13 +495,13 @@ void syntax_error_fn(struct D_Parser *ap)
       case D_SYMBOL_TOKEN:
         {
           std::locale loc;
-          mCRL2log(log::error, "parser") << "Unexpected "
+          mCRL2log(log::error) << "Unexpected "
                                          << (std::isalpha(n.string()[0], loc) ? "keyword " : "")
                                          << "'" << n.string() << "'" << std::endl;
         }
         break;
       case D_SYMBOL_NTERM:
-        mCRL2log(log::error, "parser") << "Unexpected " << s.name << " '" << n.string() << "'" << std::endl;
+        mCRL2log(log::error) << "Unexpected " << s.name << " '" << n.string() << "'" << std::endl;
         break;
       default:
         // TODO: check if we can give more sensible output in the remaining cases.
@@ -518,7 +521,7 @@ void parser::custom_parse_error(const std::string& message) const
     return;
   }
   detail::log_location(m_parser);
-  mCRL2log(log::error, "parser") << message << std::endl;
+  mCRL2log(log::error) << message << std::endl;
 }
 
 } // namespace core

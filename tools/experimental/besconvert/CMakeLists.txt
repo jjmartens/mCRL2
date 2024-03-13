@@ -1,7 +1,7 @@
-add_mcrl2_tool(besconvert
+mcrl2_add_tool(besconvert
   SOURCES
     besconvert.cpp
   DEPENDS
     mcrl2_lts
-    mcrl2_bes
+    mcrl2_pbes
 )

@@ -240,14 +240,14 @@ class highway_todo_set : public todo_set
 };
 
 template <typename Summand>
-const stochastic_distribution& summand_distribution(const Summand& /* summand */)
+inline const stochastic_distribution& summand_distribution(const Summand& /* summand */)
 {
   static stochastic_distribution empty_distribution;
   return empty_distribution;
 }
 
 template <>
-const stochastic_distribution& summand_distribution(const lps::stochastic_action_summand& summand)
+inline const stochastic_distribution& summand_distribution(const lps::stochastic_action_summand& summand)
 {
   return summand.distribution();
 }
@@ -451,10 +451,8 @@ class explorer: public abortable
     static constexpr bool is_stochastic = Stochastic;
     static constexpr bool is_timed = Timed;
 
-    typedef atermpp::indexed_set<state, atermpp::detail::GlobalThreadSafe> indexed_set_for_states_type;
+    typedef atermpp::indexed_set<state, mcrl2::utilities::detail::GlobalThreadSafe> indexed_set_for_states_type;
 
-  protected:
-    using enumerator_element = data::enumerator_list_element_with_substitution<>;
 
     struct transition
     {
@@ -466,7 +464,9 @@ class explorer: public abortable
       {}
     };
 
-    const explorer_options& m_options;
+  protected:
+    using enumerator_element = data::enumerator_list_element_with_substitution<>;
+    const explorer_options m_options;  // must not be a reference.
 
     // The four data structures that must be separate per thread.
     mutable data::mutable_indexed_substitution<> m_global_sigma;
@@ -486,7 +486,7 @@ class explorer: public abortable
     std::vector<explorer_summand> m_regular_summands;
     std::vector<explorer_summand> m_confluent_summands;
 
-    volatile bool m_must_abort = false;
+    volatile std::atomic<bool> m_must_abort = false;
 
     // N.B. The keys are stored in term_appl instead of data_expression_list for performance reasons.
     summand_cache_map global_cache;
@@ -577,7 +577,7 @@ class explorer: public abortable
                       compute_state(result.states.back(), next_state, sigma, rewr);
                       return false;
                     },
-                    [](const data::data_expression& x) { return x == real_zero(); }
+                    [](const data::data_expression& x) { return x == data::sort_real::real_zero(); }
         );
         data::remove_assignments(sigma, distribution.variables());
         if (m_options.check_probabilities)
@@ -587,7 +587,7 @@ class explorer: public abortable
       }
       else
       {
-        result.probabilities.push_back(real_one());
+        result.probabilities.push_back(data::sort_real::real_one());
         result.states.emplace_back();
         compute_state(result.states.back(),next_state,sigma,rewr);
       }
@@ -1009,6 +1009,37 @@ class explorer: public abortable
 
     ~explorer() = default;
 
+    // Get the initial state of the specification. 
+    const data::data_expression_list& initial_state() const
+    {
+      return m_initial_state;
+    }
+
+    // Make the rewriter available to be used in a class that uses this explorer class.
+    const data::rewriter& get_rewriter() const
+    {
+      return m_global_rewr;
+    }
+
+    // Utility function to obtain the outgoing transitions of the current state.
+    // Should not be used concurrently. 
+    std::list<transition> out_edges(const state& s)
+    {
+      return out_edges(s, m_regular_summands, m_confluent_summands, m_global_sigma, m_global_rewr, m_global_enumerator, m_global_id_generator);
+    }
+
+    // Utility function to obtain the outgoing transitions of the current state.
+    // Only transitions for the summand with the indicated index are generated.
+    // Should not be used concurrently. 
+    std::list<transition> out_edges(const state& s, const std::size_t summand_index)
+    {
+      assert(summand_index<m_regular_summands.size());
+      return out_edges(s, 
+                       std::vector(1, m_regular_summands[summand_index]), 
+                       m_confluent_summands, 
+                       m_global_sigma, m_global_rewr, m_global_enumerator, m_global_id_generator);
+    }
+
     // Returns the concatenation of s and [t]
     void make_timed_state(state& result, const state& s, const data::data_expression& t) const
     {
@@ -1070,18 +1101,19 @@ class explorer: public abortable
       std::vector<state> dummy;
       std::unique_ptr<todo_set> thread_todo=make_todo_set(dummy.begin(),dummy.end()); // The new states for each process are temporarily stored in this vector for each thread. 
       atermpp::term_appl<data::data_expression> key;  
-      if (atermpp::detail::GlobalThreadSafe && m_options.number_of_threads>1) m_exclusive_state_access.lock();
+
+      if (mcrl2::utilities::detail::GlobalThreadSafe && m_options.number_of_threads>1) m_exclusive_state_access.lock();
       while (number_of_active_processes>0 || !todo->empty())
       {
-        assert(thread_todo->empty());
+        assert(m_must_abort || thread_todo->empty());
           
         if (!todo->empty())
         {
           todo->choose_element(current_state);
           thread_todo->insert(current_state);
-          if (atermpp::detail::GlobalThreadSafe && m_options.number_of_threads>1) m_exclusive_state_access.unlock();
+          if (mcrl2::utilities::detail::GlobalThreadSafe && m_options.number_of_threads>1) m_exclusive_state_access.unlock();
 
-          while (!thread_todo->empty() && !m_must_abort)
+          while (!thread_todo->empty() && !m_must_abort.load(std::memory_order_relaxed))
           { 
             thread_todo->choose_element(current_state);
             std::size_t s_index = discovered.index(current_state,thread_index);
@@ -1160,20 +1192,22 @@ class explorer: public abortable
                 }
               );
             }
+
             if (number_of_idle_processes>0 && thread_todo->size()>1)
             {
-              if (todo->size()<m_options.number_of_threads)  // Not thread_safe, but number is not so important.
-              // if (todo->size()<=number_of_idle_processes)  // Not thread_safe, but number is not so important.
+              if (mcrl2::utilities::detail::GlobalThreadSafe && m_options.number_of_threads>1) m_exclusive_state_access.lock();
+
+              if (todo->size() < m_options.number_of_threads) 
               {
-                if (atermpp::detail::GlobalThreadSafe && m_options.number_of_threads>1) m_exclusive_state_access.lock();
                 // move 25% of the states of this thread to the global todo buffer.
                 for(std::size_t i=0; i<std::min(thread_todo->size()-1,1+(thread_todo->size()/4)); ++i)  
                 {
                   thread_todo->choose_element(current_state);
                   todo->insert(current_state);
                 }
-                if (atermpp::detail::GlobalThreadSafe && m_options.number_of_threads>1) m_exclusive_state_access.unlock();
               }
+
+              if (mcrl2::utilities::detail::GlobalThreadSafe && m_options.number_of_threads>1) m_exclusive_state_access.unlock();
             }
 
             finish_state(thread_index, m_options.number_of_threads, current_state, s_index, thread_todo->size());
@@ -1182,20 +1216,21 @@ class explorer: public abortable
         }
         else
         {
-          if (atermpp::detail::GlobalThreadSafe && m_options.number_of_threads>1) m_exclusive_state_access.unlock();
+          if (mcrl2::utilities::detail::GlobalThreadSafe && m_options.number_of_threads>1) m_exclusive_state_access.unlock();
         }
         // Check whether all processes are ready. If so the number_of_active_processes becomes 0. 
         // Otherwise, this thread becomes active again, and tries to see whether the todo buffer is
         // not empty, to take up more work. 
         number_of_active_processes--;
         number_of_idle_processes++;
-        if (atermpp::detail::GlobalThreadSafe && m_options.number_of_threads>1) m_exclusive_state_access.lock();
+        if (mcrl2::utilities::detail::GlobalThreadSafe && m_options.number_of_threads > 1) m_exclusive_state_access.lock();
+        
         assert(thread_todo->empty() || m_must_abort);
         if (todo->empty())
         {
-          if (atermpp::detail::GlobalThreadSafe && m_options.number_of_threads>1) m_exclusive_state_access.unlock();
+          if (mcrl2::utilities::detail::GlobalThreadSafe && m_options.number_of_threads > 1) m_exclusive_state_access.unlock();
           std::this_thread::sleep_for(std::chrono::milliseconds(100));
-          if (atermpp::detail::GlobalThreadSafe && m_options.number_of_threads>1) m_exclusive_state_access.lock();
+          if (mcrl2::utilities::detail::GlobalThreadSafe && m_options.number_of_threads>1) m_exclusive_state_access.lock();
         }
         if (number_of_active_processes>0 || !todo->empty())
         {
@@ -1204,7 +1239,7 @@ class explorer: public abortable
         number_of_idle_processes--;
       } 
       mCRL2log(log::debug) << "Stop thread " << thread_index << ".\n";
-      if (atermpp::detail::GlobalThreadSafe && m_options.number_of_threads>1) m_exclusive_state_access.unlock();
+      if (mcrl2::utilities::detail::GlobalThreadSafe && m_options.number_of_threads>1) m_exclusive_state_access.unlock();
 
     }  // end generate_state_space_thread.
 
@@ -1279,7 +1314,7 @@ class explorer: public abortable
         for(std::size_t i=1; i<=number_of_threads; ++i)  // Threads are numbered from 1 to number_of_threads. Thread number 0 is reserved as 
                                                          // indicator for a sequential implementation. 
         {
-          std::thread tr ([&, i](){ 
+          threads.emplace_back([&, i](){ 
                                     generate_state_space_thread< StateType, SummandSequence,
                                                          DiscoverState, ExamineTransition,
                                                          StartState, FinishState,
@@ -1289,8 +1324,7 @@ class explorer: public abortable
                                         regular_summands,confluent_summands,discovered, discover_state,
                                         examine_transition, start_state, finish_state, 
                                         m_global_rewr.clone(), m_global_sigma); } );  // It is essential that the rewriter is cloned as
-                                                                                      // one rewriter cannot be used in parallel. 
-          threads.push_back(std::move(tr));
+                                                                                      // one rewriter cannot be used in parallel.
         }
 
         for(std::size_t i=1; i<=number_of_threads; ++i)
@@ -1352,7 +1386,7 @@ class explorer: public abortable
         }
         if constexpr (Timed)
         {
-          make_timed_state(s0, s0, real_zero());
+          make_timed_state(s0, s0, data::sort_real::real_zero());
         }
       }
       generate_state_space(recursive, s0, m_regular_summands, m_confluent_summands, m_discovered, discover_state, 
@@ -1489,6 +1523,7 @@ class explorer: public abortable
       {
         throw mcrl2::runtime_error("Dfs exploration is not thread safe.");
       }
+
       for (const transition& tr: out_edges(s0, regular_summands, confluent_summands, m_global_sigma, m_global_rewr, m_global_enumerator, m_global_id_generator))
       {
         if (m_must_abort)
@@ -1527,6 +1562,7 @@ class explorer: public abortable
         }
       }
       gray.erase(s0);
+      
       finish_state(0, s0); // TODO MAKE THREAD SAFE
     }
 
@@ -1560,7 +1596,7 @@ class explorer: public abortable
       }
       if constexpr (Timed)
       {
-        s0 = make_timed_state(s0, real_zero());
+        s0 = make_timed_state(s0, data::sort_real::real_zero());
       }
       generate_state_space_dfs_recursive(s0, gray, discovered, m_regular_summands, m_confluent_summands, discover_state, examine_transition, tree_edge, back_edge, forward_or_cross_edge, finish_state);
       m_recursive = false;
@@ -1687,7 +1723,7 @@ class explorer: public abortable
       }
       if constexpr (Timed)
       {
-        s0 = make_timed_state(s0, real_zero());
+        s0 = make_timed_state(s0, data::sort_real::real_zero());
       }
       generate_state_space_dfs_iterative(s0, discovered, m_regular_summands, m_confluent_summands, discover_state, examine_transition, tree_edge, back_edge, forward_or_cross_edge, finish_state);
       m_recursive = false;

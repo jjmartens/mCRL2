@@ -39,7 +39,7 @@ To further guide the effectiveness of the exploration we need some additional
 background information.
 
 Symbolic Exploration
----------------
+-------------------------
 
 The effectiveness of the symbolic representation is mostly determined by the
 size (in the number of nodes shown by `--print-nodesize`) of the symbolic data
@@ -83,7 +83,7 @@ required, but doing so will over-approximate their dependencies (except for the
 consequences of the symbolic representation we explain it in more detail.
 
 Symbolic Representation
----------------
+-------------------------
 
 For the state space of a linear process the set of states is typically a set of
 vectors, where every element in the vector corresponds to a process parameter.
@@ -135,6 +135,12 @@ exactly :math:`n+1` long, because it never skips levels. For the implementation
 we use Sylvan [3], which implements list decision diagrams. These are unfolded
 multi-valued decision diagrams where every vertex has exactly two edges, one
 being the decision and the other being the next element in the list.
+
+Limitations
+-----------
+
+This tool is only available on macOS and Linux since the Sylvan dependency
+cannot be compiled by Visual Studio.
 
 References 
 ----------------------

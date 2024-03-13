@@ -8,7 +8,6 @@
 
 # ########## Project setup ##########
 project(tr)
-cmake_minimum_required(VERSION 3.8)
 
 # ######### General setup ##########
 
@@ -19,12 +18,13 @@ add_custom_target(${PROJECT_NAME}_headers
 )
 
 # actual target:
-add_library(${PROJECT_NAME} STATIC
+add_library(${PROJECT_NAME}
   source/tr.c
 )
 
 target_link_libraries(${PROJECT_NAME}
-  ${OPENGL_LIBRARY}
+  PUBLIC
+  OpenGL::GL
 )
 
-include_directories(include/tr)
+target_include_directories(${PROJECT_NAME} PUBLIC include/)

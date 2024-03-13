@@ -78,10 +78,10 @@ consists of the (distinct) elements ``true`` and ``false``::
        cdub: Bool # Positive -> Positive;
 
 If we now interpret the term :samp:`cdub(true, {num})` (where *num* is a term
-of sort ``Positive``) as "twice the number that *num* represents", and interpret
-:samp:`cdub(false, {num})` as "twice the number that *num* represents, plus 
-one", then we have created a binary encoding of the positive numbers. For 
-instance, ``cdub(false, one)`` represents the number 2, and 
+of sort ``Positive``) as "twice the number that *num* represents, plus 1", and interpret
+:samp:`cdub(false, {num})` as "twice the number that *num* represents", 
+then we have created a binary encoding of the positive numbers. For 
+instance, ``cdub(true, one)`` represents the number 3, and 
 ``cdub(false, cdub(true, cdub(false, one)))`` represents the number 10.
 
 .. note::
@@ -480,7 +480,8 @@ substituted.
 
 .. list-table:: Predefined operations on numeric sorts
    :header-rows: 1
-   :widths: 15 20 50
+   :widths: auto
+   :width: 100%
 
    * - Name
      - Sort(s)
@@ -537,7 +538,7 @@ substituted.
      - | ``Nat # Pos -> Nat``
        | ``Int # Pos -> Nat``
      - Remainder of :samp:`{a}` divided by :samp:`{b}`.
-   * - ``exp({a}, {b})``
+   * - :samp:`exp({a}, {b})`
      - | ``Pos # Nat -> Pos``
        | ``Nat # Nat -> Nat``
        | ``Int # Nat -> Int``
@@ -713,15 +714,15 @@ enumeration is defined as a shorthand to denote lists::
      - :samp:`{a}` concatenated with :samp:`{b}`.
    * - :samp:`head({a})`
      - ``List(S) -> S``
-     - The first element :samp:`{a}`.
+     - The first element of :samp:`{a}`.
    * - :samp:`tail({a})`
      - ``List(S) -> List(S)``
      - :samp:`{a}` without its first element.
    * - :samp:`rhead({a})`
-     - ``List(S) -> Nat``
+     - ``List(S) -> S``
      - The last element of :samp:`{a}`.
    * - :samp:`rtail({a})`
-     - ``List(S) -> Nat``
+     - ``List(S) -> List(S)``
      - :samp:`{a}` without its last element.
   
 .. warning::

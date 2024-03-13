@@ -16,8 +16,6 @@ Organisation of libraries:
   ============= =========================================================
   Sub-directory	Contents
   ============= =========================================================
-  build	        Library build files such as a Jamfile
-  doc	          Documentation (HTML) files
   example	      Sample program files
   include	      Header files
   src	          Source files which must be compiled to build the library
@@ -25,11 +23,8 @@ Organisation of libraries:
   ============= =========================================================
 
 * Include files belonging to library *foo* must be placed in the directory
-  *include/mcrl2/foo*. Optionally a header file *include/mcrl2/foo/foo.h*
-  may be added, that contains include directives for the most commonly used
-  header files in *include/mcrl2/foo*.
-* Library code is put in the namespace *mcrl2*. If needed, a library *foo*
-  can use its own namespace mcrl2::foo.
+  *include/mcrl2/foo*.
+* Library code is put in the namespace *mcrl2::foo*,
 
 Tools
 ^^^^^
@@ -41,7 +36,6 @@ Organisation of tools:
   ============= =========================================================
   Sub-directory	Contents
   ============= =========================================================
-  doc           Documentation (HTML) files
   test          Regression or other test programs or scripts
   ============= =========================================================  
 
@@ -86,7 +80,6 @@ The following naming conventions regarding filenames should be used:
 
 The following naming conventions regarding file contents should be used:
 
-* Use the naming conventions of the C++ Standard Library.
 * Names (except as noted below) should be all lowercase, with words separated by
   underscores.
 * Template parameter names begin with an uppercase letter.
@@ -100,7 +93,8 @@ Header policy
 The following guidelines are specific to header files
 (based on `<http://www.boost.org/more/header.htm>`_):
 
-* Unless multiple inclusion is intended, wrap the header in #ifndef guards.
+* Unless multiple inclusion is intended, wrap the header in #ifndef guards with The
+  name MCRL2_LIBRARY_PATH_TO_INCLUDE.
 * Wrap the header contents in a namespace to prevent global namespace pollution.
   mCRL2 libraries should be placed in the namespace mcrl2.
 * Make sure that a translation unit consisting of just the contents of the
@@ -184,7 +178,8 @@ When committing changes, the following guidelines should be adhered to:
     
 
 Documentation guidelines
-========================
+------------------------
+
 This page describes the documentation guidelines for tools and libraries.
 
 Tools
@@ -325,18 +320,3 @@ Where to acknowledge and to what extent:
   acknowledgements and one of the main tasks of a tool is to read a file apply
   F and return the result, then the tool should include the acknowledgements
   for F.)
-  
-Release guidelines
-==================
-* An mCRL2 toolset release takes place every 6 months.
-* The precise next release date is determined well in advance by the mCRL2 developers.
-* During a period of 15 days prior to the release date, only bug-fixing changes
-  to the development source tree are allowed. Feature additions or large,
-  structural changes are not allowed. Also, every bug fix should be checked by
-  at least one person other than its author, prior to its submission into the
-  source tree.
-* The version number of a release consists of the year and month of
-  the release date. For example: 2008.01.
-* The release itself consists of at least (but not limited to) one binary
-  Windows package and one source code package. These are made available for
-  download on the mCRL2 website.

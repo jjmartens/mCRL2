@@ -24,28 +24,28 @@ namespace detail {
 template <typename DataRewriter, typename SubstitutionFunction>
 const data::data_expression data_rewrite(const data::data_expression& x, const DataRewriter& R, SubstitutionFunction& sigma)
 {
-  mCRL2log(log::debug2) << "data_rewrite " << x << sigma << " -> " << R(x, sigma) << std::endl;
+  mCRL2log(log::trace) << "data_rewrite " << x << sigma << " -> " << R(x, sigma) << std::endl;
   return R(x, sigma);
 }
 
 template <typename DataRewriter, typename SubstitutionFunction>
 void data_rewrite(data::data_expression& result, const data::data_expression& x, const DataRewriter& R, SubstitutionFunction& sigma)
 {
-  mCRL2log(log::debug2) << "data_rewrite " << x << sigma << " -> " << R(x, sigma) << std::endl;
+  mCRL2log(log::trace) << "data_rewrite " << x << sigma << " -> " << R(x, sigma) << std::endl;
   R(result, x, sigma);
 }
 
 template <typename DataRewriter>
 const data::data_expression data_rewrite(const data::data_expression& x, const DataRewriter& R, data::no_substitution&)
 {
-  mCRL2log(log::debug2) << "data_rewrite " << x << "[]" << " -> " << R(x) << std::endl;
+  mCRL2log(log::trace) << "data_rewrite " << x << "[]" << " -> " << R(x) << std::endl;
   return R(x);
 }
 
 template <typename DataRewriter>
 void data_rewrite(data::data_expression& result, const data::data_expression& x, const DataRewriter& R, data::no_substitution&)
 {
-  mCRL2log(log::debug2) << "data_rewrite " << x << "[]" << " -> " << R(x) << std::endl;
+  mCRL2log(log::trace) << "data_rewrite " << x << "[]" << " -> " << R(x) << std::endl;
   result = R(x);
 }
 
@@ -66,21 +66,11 @@ struct add_data_rewriter: public Builder<Derived>
   void apply(T& result, const data::data_expression& x)
   {
     data_rewrite(atermpp::reference_cast<data::data_expression>(result), x, R, sigma);
-    // data_rewrite(reinterpret_cast<data::data_expression&>(result), x, R, sigma);
-    // result = data_rewrite(x, R, sigma);
   }
 
   template <class T>
   void apply(T& result, const propositional_variable_instantiation& x)
   {
-    /* std::vector<data::data_expression> d;
-    for (const data::data_expression& e: x.parameters())
-    {
-      data::data_expression r;
-      r = data_rewrite(e, R, sigma);
-      d.push_back(r);
-    } 
-    make_propositional_variable_instantiation(result, x.name(), data::data_expression_list(d.begin(), d.end())); */
     make_propositional_variable_instantiation(
               result, 
               x.name(), 

@@ -56,6 +56,8 @@ class probabilistic_state
     typedef PROBABILITY probability_t;
     typedef typename std::vector<state_probability_pair>::iterator iterator;
     typedef typename std::vector<state_probability_pair>::const_iterator const_iterator;
+    typedef typename std::vector<state_probability_pair>::reverse_iterator reverse_iterator;
+    typedef typename std::vector<state_probability_pair>::const_reverse_iterator const_reverse_iterator;
 
   protected:
 
@@ -221,6 +223,8 @@ class probabilistic_state
     void shrink_to_fit()
     {
       m_probabilistic_state.shrink_to_fit();
+      assert((m_probabilistic_state.size()>1 && m_single_state==std::size_t(-1)) ||
+             (m_probabilistic_state.size()==0 && m_single_state!=std::size_t(-1)));
 #ifndef NDEBUG
       PROBABILITY sum=PROBABILITY::zero();
       for(const state_probability_pair& p: m_probabilistic_state)
@@ -265,7 +269,7 @@ class probabilistic_state
      ** \return The iterator pointing beyond the last state probability pair in a probabilistic state. */
     const_iterator end() const
     {
-      return m_probabilistic_state.cend();
+      return m_probabilistic_state.end();
     }
 
     /** \brief Gets an iterator over pairs of state and probability. This can only be used if the state is internally stored as a vector. 
@@ -280,6 +284,35 @@ class probabilistic_state
     iterator end()
     {
       return m_probabilistic_state.end();
+    }
+
+    /** \brief Gets a reverse iterator over pairs of state and probability. This can only be used when the state is stored 
+     **        internally as a vector.  
+     *  \return The iterator pointing at the last state probability pair. */
+    const_reverse_iterator rbegin() const
+    {
+      return m_probabilistic_state.rbegin();
+    }
+
+    /** \brief Gets the reverse end iterator over pairs of state and probability.
+     ** \return The iterator pointing before the first state probability pair in a probabilistic state. */
+    const_reverse_iterator rend() const
+    {
+      return m_probabilistic_state.rend();
+    }
+
+    /** \brief Gets a reverse iterator over pairs of state and probability. This can only be used if the state is internally stored as a vector. 
+     ** \return The iterator pointing at the last state probability pair. */
+    reverse_iterator rbegin()
+    {
+      return m_probabilistic_state.rbegin();
+    }
+
+    /** \brief Gets the reverse end iterator over pairs of state and probability.
+     ** \return The iterator pointing before the first state probability pair in a probabilistic state. */
+    reverse_iterator rend()
+    {
+      return m_probabilistic_state.rend();
     }
 };
 
@@ -334,9 +367,9 @@ namespace std
 {
 
 /// \brief Specialization of the standard std::hash function.
-/// \detail It is essential that this hash function yields the same has for a singular
-///         state in a distribution, stored as a number with implicit probability 1, or
-///         as a vector of length 1. 
+/// \details It is essential that this hash function yields the same has for a singular
+///          state in a distribution, stored as a number with implicit probability 1, or
+///          as a vector of length 1. 
 template < class STATE, class PROBABILITY >
 struct hash< mcrl2::lts::probabilistic_state<STATE, PROBABILITY> >
 {

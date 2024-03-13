@@ -8,10 +8,11 @@
 //
 /// \file mcrl2/data/detail/rewrite/jittycpreamble.h
 
-#ifndef __REWR_JITTYC_PREAMBLE_H
-#define __REWR_JITTYC_PREAMBLE_H
+#ifndef MCRL2_DATA_DETAIL_REWR_JITTYC_PREAMBLE_H
+#define MCRL2_DATA_DETAIL_REWR_JITTYC_PREAMBLE_H
 
 #include "mcrl2/utilities/toolset_version_const.h"
+#include "mcrl2/utilities/export.h"
 #include "mcrl2/data/detail/rewrite/jitty_jittyc.h"
 #include "mcrl2/data/detail/rewrite/jittyc.h"
 
@@ -22,14 +23,9 @@ using atermpp::down_cast;
 //
 // Declaration of rewriter library interface
 //
-#ifdef _MSC_VER
-#define DLLEXPORT __declspec(dllexport)
-#else
-#define DLLEXPORT
-#endif // _MSC_VER
 
 extern "C" {
-  DLLEXPORT bool init(rewriter_interface* i, RewriterCompilingJitty* this_rewriter);
+  MCRL2_EXPORT bool init(rewriter_interface* i, RewriterCompilingJitty* this_rewriter);
 }
 
 // A rewrite_term is a term that may or may not be in normal form. If the method"
@@ -331,15 +327,7 @@ void rewrite_aux(data_expression& result, const data_expression& t, RewriterComp
   {
     const std::size_t index = get_index(down_cast<function_symbol>(t));
     if (index<this_rewriter->normal_forms_for_constants.size())
-    {
-      // The following line is replaced by the more efficient assign, but should be reinstalled
-      // in due time, when the compiler can more efficiently handle thread local terms. 
-      // result = this_rewriter->normal_forms_for_constants[index];
-      /* result.assign(this_rewriter->normal_forms_for_constants[index], 
-                    this_rewriter->m_busy_flag,
-                    this_rewriter->m_forbidden_flag,
-                    *this_rewriter->m_creation_depth); */
-             
+    {             
       // In this case we can use an unprotected_assign as the normal_forms_for_constants will 
       // not change anymore, while rewriting is going on. 
       result.unprotected_assign<false>(this_rewriter->normal_forms_for_constants[index]);
@@ -382,9 +370,7 @@ void rewrite_aux(data_expression& result, const data_expression& t, RewriterComp
   if (is_variable(t))
   {
     sigma(this_rewriter).apply(down_cast<variable>(t),result,
-                               this_rewriter->m_busy_flag,           // Adding the busy/forbidden/creation depth is an optimisation.
-                               this_rewriter->m_forbidden_flag,
-                               this_rewriter->m_lock_depth);
+                               *this_rewriter->m_thread_aterm_pool);
     return;
   }
   else
@@ -423,13 +409,12 @@ void rewrite_cleanup()
 
 bool init(rewriter_interface* i, RewriterCompilingJitty* this_rewriter)
 {
-#ifndef MCRL2_DISABLE_JITTYC_VERSION_CHECK
   if (mcrl2::utilities::MCRL2_VERSION != i->caller_toolset_version)
   {
     i->status = "rewriter version does not match the version of the calling application.";
     return false;
   }
-#endif
+
   i->rewrite_external = &rewrite;
   i->rewrite_cleanup = &rewrite_cleanup;
   set_the_precompiled_rewrite_functions_in_a_lookup_table(this_rewriter);
@@ -437,4 +422,4 @@ bool init(rewriter_interface* i, RewriterCompilingJitty* this_rewriter)
   return true;
 }
 
-#endif // __REWR_JITTYC_PREAMBLE_H
+#endif // MCRL2_DATA_DETAIL_REWR_JITTYC_PREAMBLE_H

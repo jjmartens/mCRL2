@@ -1170,7 +1170,7 @@ bool destructive_bisimulation_compare_minimal_depth(
     {
         return true; 
     }
-    //LTSs are not bisimilar, we can create a counter example. 
+    // LTSs are not bisimilar, we can create a counter example. 
     std::string filename = "Counterexample.mcf";
     if (!counter_example_file.empty()) {
         filename = counter_example_file;

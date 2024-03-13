@@ -219,7 +219,7 @@
                 ::= LinearProcessInit(<DataExpr>*, <Distribution>)
 
 
-//Mu-calculus formulas
+//Mu-calculus formulas (including the plus and multiplication with constants)
 //--------------------
 
 //state formula
@@ -227,11 +227,17 @@
                  | StateTrue
                  | StateFalse
                  | StateNot(<StateFrm>)
+                 | StateMinus(<StateFrm>)
                  | StateAnd(<StateFrm>, <StateFrm>)
                  | StateOr(<StateFrm>, <StateFrm>)
                  | StateImp(<StateFrm>, <StateFrm>)
+                 | StatePlus(<StateFrm>, <StateFrm>)
+                 | StateConstantMultiply(<DataExpr>, <StateFrm>)
+                 | StateConstantMultiplyAlt(<StateFrm>, <DataExpr>)
                  | StateForall(<DataVarId>+, <StateFrm>)
                  | StateExists(<DataVarId>+, <StateFrm>)
+                 | StateInfimum(<DataVarId>+, <StateFrm>)
+                 | StateSupremum(<DataVarId>+, <StateFrm>)
                  | StateMust(<RegFrm>, <StateFrm>)
                  | StateMay(<RegFrm>, <StateFrm>)
                  | StateYaled
@@ -331,32 +337,39 @@
 //propositional variable instantiation
 <PropVarInst>  ::= PropVarInst(<String>, <DataExpr>*)
 
-//Boolean expressions
-//-------------------
+//PRES's
+//------
 
-// BES specification (equations + initialization)
-<BES>          ::= BES(<BooleanEquation>*, <BooleanExpression>)
+//PRES specification
+<PRES>         ::= PRES(<DataSpec>, <GlobVarSpec>, <PREqnSpec>, <PRInit>)
 
-// boolean equation
-<BooleanEquation>   ::= BooleanEquation(<FixPoint>, <BooleanVariable>, <BooleanExpression>)
+//parameterized real equation specification
+<PREqnSpec>    ::= PREqnSpec(<PREqn>*)
 
-// boolean variable
-<BooleanVariable>   ::= BooleanVariable(<String>)
+//parameterized real initialization
+<PRInit>       ::= PRInit(<PropVarInst>)
 
-// boolean expression
-<BooleanExpression> ::= BooleanTrue
-                      | BooleanFalse
-                      | <BooleanVariable>
-                      | BooleanNot(<BooleanExpression>)
-                      | BooleanAnd(<BooleanExpression>, <BooleanExpression>)
-                      | BooleanOr(<BooleanExpression>, <BooleanExpression>)
-                      | BooleanImp(<BooleanExpression>, <BooleanExpression>)
+//parameterized boolean equation
+<PREqn>        ::= PREqn(<FixPoint>, <PropVarDecl>, <PRExpr>)
 
-//BDDs
-//-------------------
-
-// bdd expression
-<BddExpression> ::= BddTrue
-                  | BddFalse
-                  | BddIf(<String>, <BddExpression>, <BddExpression>)
+//parameterized real expression
+<PRExpr>       ::= <DataExpr>
+                 | PRESTrue
+                 | PRESFalse
+                 | PRESMinus(<PRExpr>)
+                 | PRESAnd(<PRExpr>, <PRExpr>)
+                 | PRESOr(<PRExpr>, <PRExpr>)
+                 | PRESImp(<PRExpr>, <PRExpr>)
+                 | PRESPlus(<PRExpr>, <PRExpr>)
+                 | PRESConstantMultiply(<DataExpr>, <PRExpr>)
+                 | PRESConstantMultiplyAlt(<PRExpr>, <DataExpr>)
+                 | PRESInfimum(<DataVarId>+, <PRExpr>)
+                 | PRESSupremum(<DataVarId>+, <PRExpr>)
+                 | PRESSum(<DataVarId>+, <PRExpr>)
+                 | PRESEqInf(<PRExpr>)
+                 | PRESEqNInf(<PRExpr>)
+                 | PRESCondSm(<PRExpr>,<PRExpr>,<PRExpr>)
+                 | PRESCondEq(<PRExpr>,<PRExpr>,<PRExpr>)
+                 | <PropVarInst>
+                 | <UntypedDataParameter>
 

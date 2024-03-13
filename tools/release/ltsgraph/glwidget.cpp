@@ -11,6 +11,8 @@
 #include "glwidget.h"
 
 #include <QtOpenGL>
+#include <QMessageBox>
+
 #include "mcrl2/utilities/logger.h"
 #include "mcrl2/utilities/exception.h"
 #include "mcrl2/gui/arcball.h"
@@ -18,10 +20,6 @@
 
 /// \brief Minimum distance for a drag to be registered (pixels)
 constexpr float DRAG_MIN_DIST = 20.0f;
-
-/// \brief Refreshing of OpenGL canvas properties
-constexpr int TARGET_FRAME_RATE = 60;
-constexpr int TARGET_FRAME_TIME = 1000 / TARGET_FRAME_RATE; // We round down.
 
 struct MoveRecord
 {
@@ -169,13 +167,6 @@ GLWidget::GLWidget(Graph::Graph& graph, QWidget* parent)
   m_scene.setDevicePixelRatio(devicePixelRatio());
   mCRL2log(mcrl2::log::debug)
       << "Devicepixelratio: " << devicePixelRatio() << std::endl;
-
-  /// TODO: Move draw_timer to member variables so that drawing can be disabled
-  /// when graph stable and user does not interact with screen
-  // Set GLWidget to continuously update
-  QTimer* draw_timer = new QTimer(this);
-  connect(draw_timer, SIGNAL(timeout()), this, SLOT(update()));
-  draw_timer->start(TARGET_FRAME_TIME);
 }
 
 GLWidget::~GLWidget()
@@ -427,7 +418,7 @@ void GLWidget::mousePressEvent(QMouseEvent* e)
     }
     else if (e->modifiers() == Qt::ShiftModifier)
     {
-      if (e->button() == Qt::LeftButton && m_is_threedimensional)
+      if (e->button() == Qt::LeftButton && m_scene.m_is_threedimensional)
       {
         m_dragmode = dm_rotate;
       }
@@ -443,7 +434,7 @@ void GLWidget::mousePressEvent(QMouseEvent* e)
     {
       if (m_hover.selectionType == GLScene::SelectableObject::none)
       {
-        if (e->button() == Qt::RightButton && m_is_threedimensional)
+        if (e->button() == Qt::RightButton && m_scene.m_is_threedimensional)
         {
           m_dragmode = dm_rotate;
         }
@@ -457,6 +448,14 @@ void GLWidget::mousePressEvent(QMouseEvent* e)
       else
       {
         m_dragmode = dm_dragnode;
+
+        if (m_dragnode != nullptr) {
+          // A drag action was already in process so release it, and delete the node first.          
+          m_dragnode->release(false);
+          delete m_dragnode;
+          m_dragnode = nullptr;
+        }
+
         switch (m_hover.selectionType)
         {
         case GLScene::SelectableObject::node:
@@ -606,12 +605,12 @@ void GLWidget::rebuild()
 
 void GLWidget::set3D(bool enabled)
 {
-  if (!enabled && m_is_threedimensional)
+  if (!enabled && m_scene.m_is_threedimensional)
   {
     m_scene.project2D();
   }
   m_ui->m_ui.cbThreeDimensional->setChecked(enabled);
-  m_is_threedimensional = enabled;
+  m_scene.m_is_threedimensional = enabled;
   update();
   m_graph.hasNewFrame(true);
   m_graph.setStable(false);
@@ -619,7 +618,7 @@ void GLWidget::set3D(bool enabled)
 
 bool GLWidget::get3D()
 {
-  return m_is_threedimensional;
+  return m_scene.m_is_threedimensional;
 }
 
 void GLWidget::resetViewpoint(std::size_t)
@@ -632,6 +631,25 @@ void GLWidget::resetViewpoint(std::size_t)
 void GLWidget::setPaint(const QColor& color)
 {
   m_paintcolor = QVector3D(color.redF(), color.greenF(), color.blueF());
+}
+
+void GLWidget::paintDeadlocks()
+{  
+  // Some adhoc deadlock detection algorithm with an awful graph interface, ignores exploration mode.
+  std::vector<bool> deadlocked(m_graph.nodeCount(), true);
+  for (std::size_t i = 0; i < m_graph.edgeCount(); ++i)
+  {
+    Graph::Edge e = m_graph.edge(i);
+    deadlocked[e.from()] = false;
+  }
+  
+  for (std::size_t i = 0; i < deadlocked.size(); ++i)
+  {
+    if (deadlocked[i])
+    {
+      m_graph.node(i).color() = m_paintcolor;
+    }
+  }
 }
 
 const QVector3D& GLWidget::getPaint() const
@@ -701,6 +719,9 @@ GLWidgetUi::GLWidgetUi(GLWidget& widget, QWidget* parent)
   connect(m_ui.btnPaint, SIGNAL(toggled(bool)), this, SLOT(setPaintMode(bool)));
   connect(m_ui.btnPaint, SIGNAL(toggled(bool)), parentWidget(),
           SLOT(updateStatusBar()));
+  
+  connect(m_ui.btnPaintDeadlocks, SIGNAL(clicked()), &m_widget, SLOT(paintDeadlocks()));
+
   connect(m_ui.btnSelectColor, SIGNAL(clicked()), m_colordialog, SLOT(exec()));
   connect(m_ui.cbTransitionLabels, SIGNAL(toggled(bool)), &m_widget,
           SLOT(toggleTransitionLabels(bool)));

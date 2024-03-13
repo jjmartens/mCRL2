@@ -25,6 +25,10 @@ namespace detail {
 // Part 1: functions for creating function symbols.
 //----------------------------------------------------------------------------------------------//
 
+// Use a fixed size array for the "smaller" DataAppl and the dynamic
+constexpr std::size_t DataApplFixed = 100;
+extern atermpp::function_symbol function_symbols_DataApplFixed[DataApplFixed];
+
 // We use a vector of pointers here, and not a vector of objects. The latter would
 // result in references becoming invalid when the vector is resized, i.e., when a new
 // element is added. That would mean that function_symbol_DataAppl and function_symbol_DataAppl_helper
@@ -35,24 +39,42 @@ extern std::vector<std::unique_ptr<atermpp::function_symbol>> function_symbols_D
 inline
 const atermpp::function_symbol& function_symbol_DataAppl_helper(std::size_t i)
 {
+  static std::mutex mutex;
+
+  // Since it is larger than DataApplFixed we can ignore the start indices.
+  i -= DataApplFixed;
+  mutex.lock();
   do
   {
-    function_symbols_DataAppl.push_back(std::unique_ptr<atermpp::function_symbol>(new atermpp::function_symbol("DataAppl", function_symbols_DataAppl.size())));
+    function_symbols_DataAppl.push_back(std::make_unique<atermpp::function_symbol>("DataAppl", function_symbols_DataAppl.size() + DataApplFixed));
   }
   while (i >= function_symbols_DataAppl.size());
-  return *function_symbols_DataAppl[i];
+  
+  const atermpp::function_symbol& result = *function_symbols_DataAppl[i];
+  mutex.unlock();
+
+  return result;  
 }
 
 inline
 const atermpp::function_symbol& function_symbol_DataAppl(std::size_t i)
 {
-  if (i >= function_symbols_DataAppl.size())
-  {
-    // This helper is introduced such the function function_symbol_DataAppl, which is called very often,
-    // will be inlined.
+  if (i < DataApplFixed) {
+    // This is not thread safe, but applications are made during the initialisation process.
+    static bool initialised = false;
+    if (!initialised) {
+      for (std::size_t i = 0; i < DataApplFixed; ++i) {
+        function_symbols_DataApplFixed[i] = atermpp::function_symbol("DataAppl", i);
+      }
+
+      initialised = true;
+    }
+
+    return function_symbols_DataApplFixed[i];
+  } else {
+    // This is much more expensive so deferred to a separate function call.
     return function_symbol_DataAppl_helper(i);
   }
-  return *function_symbols_DataAppl[i];
 }
 
 inline
@@ -64,7 +86,11 @@ bool gsIsDataAppl(const atermpp::aterm_appl& Term)
 inline
 bool gsIsDataAppl_no_check(const atermpp::aterm_appl& Term)
 {
-  return Term.function() == *function_symbols_DataAppl[Term.function().arity()];
+  if (Term.function().arity() < DataApplFixed) {
+    return Term.function() == function_symbols_DataApplFixed[Term.function().arity()];
+  } else {
+    return Term.function() == *function_symbols_DataAppl[Term.function().arity() - DataApplFixed];
+  }
 }
 
 // DataVarIdNoIndex
@@ -252,14 +278,6 @@ const atermpp::function_symbol& function_symbol_AtTime()
   return function_symbol_AtTime;
 }
 
-// BES
-inline
-const atermpp::function_symbol& function_symbol_BES()
-{
-  static const atermpp::global_function_symbol function_symbol_BES("BES", 2);
-  return function_symbol_BES;
-}
-
 // BInit
 inline
 const atermpp::function_symbol& function_symbol_BInit()
@@ -276,30 +294,6 @@ const atermpp::function_symbol& function_symbol_BagComp()
   return function_symbol_BagComp;
 }
 
-// BddFalse
-inline
-const atermpp::function_symbol& function_symbol_BddFalse()
-{
-  static const atermpp::global_function_symbol function_symbol_BddFalse("BddFalse", 0);
-  return function_symbol_BddFalse;
-}
-
-// BddIf
-inline
-const atermpp::function_symbol& function_symbol_BddIf()
-{
-  static const atermpp::global_function_symbol function_symbol_BddIf("BddIf", 3);
-  return function_symbol_BddIf;
-}
-
-// BddTrue
-inline
-const atermpp::function_symbol& function_symbol_BddTrue()
-{
-  static const atermpp::global_function_symbol function_symbol_BddTrue("BddTrue", 0);
-  return function_symbol_BddTrue;
-}
-
 // Binder
 inline
 const atermpp::function_symbol& function_symbol_Binder()
@@ -314,70 +308,6 @@ const atermpp::function_symbol& function_symbol_Block()
 {
   static const atermpp::global_function_symbol function_symbol_Block("Block", 2);
   return function_symbol_Block;
-}
-
-// BooleanAnd
-inline
-const atermpp::function_symbol& function_symbol_BooleanAnd()
-{
-  static const atermpp::global_function_symbol function_symbol_BooleanAnd("BooleanAnd", 2);
-  return function_symbol_BooleanAnd;
-}
-
-// BooleanEquation
-inline
-const atermpp::function_symbol& function_symbol_BooleanEquation()
-{
-  static const atermpp::global_function_symbol function_symbol_BooleanEquation("BooleanEquation", 3);
-  return function_symbol_BooleanEquation;
-}
-
-// BooleanFalse
-inline
-const atermpp::function_symbol& function_symbol_BooleanFalse()
-{
-  static const atermpp::global_function_symbol function_symbol_BooleanFalse("BooleanFalse", 0);
-  return function_symbol_BooleanFalse;
-}
-
-// BooleanImp
-inline
-const atermpp::function_symbol& function_symbol_BooleanImp()
-{
-  static const atermpp::global_function_symbol function_symbol_BooleanImp("BooleanImp", 2);
-  return function_symbol_BooleanImp;
-}
-
-// BooleanNot
-inline
-const atermpp::function_symbol& function_symbol_BooleanNot()
-{
-  static const atermpp::global_function_symbol function_symbol_BooleanNot("BooleanNot", 1);
-  return function_symbol_BooleanNot;
-}
-
-// BooleanOr
-inline
-const atermpp::function_symbol& function_symbol_BooleanOr()
-{
-  static const atermpp::global_function_symbol function_symbol_BooleanOr("BooleanOr", 2);
-  return function_symbol_BooleanOr;
-}
-
-// BooleanTrue
-inline
-const atermpp::function_symbol& function_symbol_BooleanTrue()
-{
-  static const atermpp::global_function_symbol function_symbol_BooleanTrue("BooleanTrue", 0);
-  return function_symbol_BooleanTrue;
-}
-
-// BooleanVariable
-inline
-const atermpp::function_symbol& function_symbol_BooleanVariable()
-{
-  static const atermpp::global_function_symbol function_symbol_BooleanVariable("BooleanVariable", 1);
-  return function_symbol_BooleanVariable;
 }
 
 // Choice
@@ -716,6 +646,166 @@ const atermpp::function_symbol& function_symbol_PBInit()
   return function_symbol_PBInit;
 }
 
+// PRES
+inline
+const atermpp::function_symbol& function_symbol_PRES()
+{
+  static const atermpp::global_function_symbol function_symbol_PRES("PRES", 4);
+  return function_symbol_PRES;
+}
+
+// PRESAnd
+inline
+const atermpp::function_symbol& function_symbol_PRESAnd()
+{
+  static const atermpp::global_function_symbol function_symbol_PRESAnd("PRESAnd", 2);
+  return function_symbol_PRESAnd;
+}
+
+// PRESCondEq
+inline
+const atermpp::function_symbol& function_symbol_PRESCondEq()
+{
+  static const atermpp::global_function_symbol function_symbol_PRESCondEq("PRESCondEq", 3);
+  return function_symbol_PRESCondEq;
+}
+
+// PRESCondSm
+inline
+const atermpp::function_symbol& function_symbol_PRESCondSm()
+{
+  static const atermpp::global_function_symbol function_symbol_PRESCondSm("PRESCondSm", 3);
+  return function_symbol_PRESCondSm;
+}
+
+// PRESConstantMultiply
+inline
+const atermpp::function_symbol& function_symbol_PRESConstantMultiply()
+{
+  static const atermpp::global_function_symbol function_symbol_PRESConstantMultiply("PRESConstantMultiply", 2);
+  return function_symbol_PRESConstantMultiply;
+}
+
+// PRESConstantMultiplyAlt
+inline
+const atermpp::function_symbol& function_symbol_PRESConstantMultiplyAlt()
+{
+  static const atermpp::global_function_symbol function_symbol_PRESConstantMultiplyAlt("PRESConstantMultiplyAlt", 2);
+  return function_symbol_PRESConstantMultiplyAlt;
+}
+
+// PRESEqInf
+inline
+const atermpp::function_symbol& function_symbol_PRESEqInf()
+{
+  static const atermpp::global_function_symbol function_symbol_PRESEqInf("PRESEqInf", 1);
+  return function_symbol_PRESEqInf;
+}
+
+// PRESEqNInf
+inline
+const atermpp::function_symbol& function_symbol_PRESEqNInf()
+{
+  static const atermpp::global_function_symbol function_symbol_PRESEqNInf("PRESEqNInf", 1);
+  return function_symbol_PRESEqNInf;
+}
+
+// PRESFalse
+inline
+const atermpp::function_symbol& function_symbol_PRESFalse()
+{
+  static const atermpp::global_function_symbol function_symbol_PRESFalse("PRESFalse", 0);
+  return function_symbol_PRESFalse;
+}
+
+// PRESImp
+inline
+const atermpp::function_symbol& function_symbol_PRESImp()
+{
+  static const atermpp::global_function_symbol function_symbol_PRESImp("PRESImp", 2);
+  return function_symbol_PRESImp;
+}
+
+// PRESInfimum
+inline
+const atermpp::function_symbol& function_symbol_PRESInfimum()
+{
+  static const atermpp::global_function_symbol function_symbol_PRESInfimum("PRESInfimum", 2);
+  return function_symbol_PRESInfimum;
+}
+
+// PRESMinus
+inline
+const atermpp::function_symbol& function_symbol_PRESMinus()
+{
+  static const atermpp::global_function_symbol function_symbol_PRESMinus("PRESMinus", 1);
+  return function_symbol_PRESMinus;
+}
+
+// PRESOr
+inline
+const atermpp::function_symbol& function_symbol_PRESOr()
+{
+  static const atermpp::global_function_symbol function_symbol_PRESOr("PRESOr", 2);
+  return function_symbol_PRESOr;
+}
+
+// PRESPlus
+inline
+const atermpp::function_symbol& function_symbol_PRESPlus()
+{
+  static const atermpp::global_function_symbol function_symbol_PRESPlus("PRESPlus", 2);
+  return function_symbol_PRESPlus;
+}
+
+// PRESSum
+inline
+const atermpp::function_symbol& function_symbol_PRESSum()
+{
+  static const atermpp::global_function_symbol function_symbol_PRESSum("PRESSum", 2);
+  return function_symbol_PRESSum;
+}
+
+// PRESSupremum
+inline
+const atermpp::function_symbol& function_symbol_PRESSupremum()
+{
+  static const atermpp::global_function_symbol function_symbol_PRESSupremum("PRESSupremum", 2);
+  return function_symbol_PRESSupremum;
+}
+
+// PRESTrue
+inline
+const atermpp::function_symbol& function_symbol_PRESTrue()
+{
+  static const atermpp::global_function_symbol function_symbol_PRESTrue("PRESTrue", 0);
+  return function_symbol_PRESTrue;
+}
+
+// PREqn
+inline
+const atermpp::function_symbol& function_symbol_PREqn()
+{
+  static const atermpp::global_function_symbol function_symbol_PREqn("PREqn", 3);
+  return function_symbol_PREqn;
+}
+
+// PREqnSpec
+inline
+const atermpp::function_symbol& function_symbol_PREqnSpec()
+{
+  static const atermpp::global_function_symbol function_symbol_PREqnSpec("PREqnSpec", 1);
+  return function_symbol_PREqnSpec;
+}
+
+// PRInit
+inline
+const atermpp::function_symbol& function_symbol_PRInit()
+{
+  static const atermpp::global_function_symbol function_symbol_PRInit("PRInit", 1);
+  return function_symbol_PRInit;
+}
+
 // ProcEqn
 inline
 const atermpp::function_symbol& function_symbol_ProcEqn()
@@ -956,6 +1046,22 @@ const atermpp::function_symbol& function_symbol_StateAnd()
   return function_symbol_StateAnd;
 }
 
+// StateConstantMultiply
+inline
+const atermpp::function_symbol& function_symbol_StateConstantMultiply()
+{
+  static const atermpp::global_function_symbol function_symbol_StateConstantMultiply("StateConstantMultiply", 2);
+  return function_symbol_StateConstantMultiply;
+}
+
+// StateConstantMultiplyAlt
+inline
+const atermpp::function_symbol& function_symbol_StateConstantMultiplyAlt()
+{
+  static const atermpp::global_function_symbol function_symbol_StateConstantMultiplyAlt("StateConstantMultiplyAlt", 2);
+  return function_symbol_StateConstantMultiplyAlt;
+}
+
 // StateDelay
 inline
 const atermpp::function_symbol& function_symbol_StateDelay()
@@ -1004,12 +1110,28 @@ const atermpp::function_symbol& function_symbol_StateImp()
   return function_symbol_StateImp;
 }
 
+// StateInfimum
+inline
+const atermpp::function_symbol& function_symbol_StateInfimum()
+{
+  static const atermpp::global_function_symbol function_symbol_StateInfimum("StateInfimum", 2);
+  return function_symbol_StateInfimum;
+}
+
 // StateMay
 inline
 const atermpp::function_symbol& function_symbol_StateMay()
 {
   static const atermpp::global_function_symbol function_symbol_StateMay("StateMay", 2);
   return function_symbol_StateMay;
+}
+
+// StateMinus
+inline
+const atermpp::function_symbol& function_symbol_StateMinus()
+{
+  static const atermpp::global_function_symbol function_symbol_StateMinus("StateMinus", 1);
+  return function_symbol_StateMinus;
 }
 
 // StateMu
@@ -1050,6 +1172,22 @@ const atermpp::function_symbol& function_symbol_StateOr()
 {
   static const atermpp::global_function_symbol function_symbol_StateOr("StateOr", 2);
   return function_symbol_StateOr;
+}
+
+// StatePlus
+inline
+const atermpp::function_symbol& function_symbol_StatePlus()
+{
+  static const atermpp::global_function_symbol function_symbol_StatePlus("StatePlus", 2);
+  return function_symbol_StatePlus;
+}
+
+// StateSupremum
+inline
+const atermpp::function_symbol& function_symbol_StateSupremum()
+{
+  static const atermpp::global_function_symbol function_symbol_StateSupremum("StateSupremum", 2);
+  return function_symbol_StateSupremum;
 }
 
 // StateTrue
@@ -1315,11 +1453,17 @@ static const atermpp::function_symbol SortCons;
   static const atermpp::function_symbol StateTrue;
   static const atermpp::function_symbol StateFalse;
   static const atermpp::function_symbol StateNot;
+  static const atermpp::function_symbol StateMinus;
   static const atermpp::function_symbol StateAnd;
   static const atermpp::function_symbol StateOr;
   static const atermpp::function_symbol StateImp;
+  static const atermpp::function_symbol StatePlus;
+  static const atermpp::function_symbol StateConstantMultiply;
+  static const atermpp::function_symbol StateConstantMultiplyAlt;
   static const atermpp::function_symbol StateForall;
   static const atermpp::function_symbol StateExists;
+  static const atermpp::function_symbol StateInfimum;
+  static const atermpp::function_symbol StateSupremum;
   static const atermpp::function_symbol StateMust;
   static const atermpp::function_symbol StateMay;
   static const atermpp::function_symbol StateYaled;
@@ -1364,18 +1508,26 @@ static const atermpp::function_symbol SortCons;
   static const atermpp::function_symbol PBESForall;
   static const atermpp::function_symbol PBESExists;
   static const atermpp::function_symbol PropVarInst;
-  static const atermpp::function_symbol BES;
-  static const atermpp::function_symbol BooleanEquation;
-  static const atermpp::function_symbol BooleanVariable;
-  static const atermpp::function_symbol BooleanTrue;
-  static const atermpp::function_symbol BooleanFalse;
-  static const atermpp::function_symbol BooleanNot;
-  static const atermpp::function_symbol BooleanAnd;
-  static const atermpp::function_symbol BooleanOr;
-  static const atermpp::function_symbol BooleanImp;
-  static const atermpp::function_symbol BddTrue;
-  static const atermpp::function_symbol BddFalse;
-  static const atermpp::function_symbol BddIf;
+  static const atermpp::function_symbol PRES;
+  static const atermpp::function_symbol PREqnSpec;
+  static const atermpp::function_symbol PRInit;
+  static const atermpp::function_symbol PREqn;
+  static const atermpp::function_symbol PRESTrue;
+  static const atermpp::function_symbol PRESFalse;
+  static const atermpp::function_symbol PRESMinus;
+  static const atermpp::function_symbol PRESAnd;
+  static const atermpp::function_symbol PRESOr;
+  static const atermpp::function_symbol PRESImp;
+  static const atermpp::function_symbol PRESPlus;
+  static const atermpp::function_symbol PRESConstantMultiply;
+  static const atermpp::function_symbol PRESConstantMultiplyAlt;
+  static const atermpp::function_symbol PRESInfimum;
+  static const atermpp::function_symbol PRESSupremum;
+  static const atermpp::function_symbol PRESSum;
+  static const atermpp::function_symbol PRESEqInf;
+  static const atermpp::function_symbol PRESEqNInf;
+  static const atermpp::function_symbol PRESCondSm;
+  static const atermpp::function_symbol PRESCondEq;
 //--- end generated variables ---//
 };
 

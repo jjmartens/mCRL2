@@ -6,11 +6,7 @@
 # (See accompanying file LICENSE_1_0.txt or copy at
 # http://www.boost.org/LICENSE_1_0.txt)
 
-# ########## Project setup ##########
-project(sylvan)
-cmake_minimum_required(VERSION 3.8)
-
-add_library(sylvan STATIC
+add_library(sylvan
   lace.c
   sha2.c
   sylvan_bdd.c
@@ -20,7 +16,8 @@ add_library(sylvan STATIC
   sylvan_ldd.c
   sylvan_mt.c
   sylvan_mtbdd.c
-  sylvan_obj.cpp
+  # Sylvan is actually a C library, and this should not compile in C++17.
+  #sylvan_obj.cpp
   sylvan_refs.c
   sylvan_sl.c
   sylvan_stats.c
@@ -28,8 +25,6 @@ add_library(sylvan STATIC
 )
 
 target_include_directories(sylvan PUBLIC .)
-target_compile_options(sylvan PRIVATE -Wno-pedantic)
-
 target_link_libraries(sylvan pthread)
 
 set(sylvan_include ${CMAKE_CURRENT_SOURCE_DIR} PARENT_SCOPE)

@@ -1,1 +1,7 @@
-build/docker/*
+.git/
+.vscode/
+.vs/
+benchmarks/
+scripts/docker/
+!scripts/docker/ltsmin/ltsmin.patch
+build/

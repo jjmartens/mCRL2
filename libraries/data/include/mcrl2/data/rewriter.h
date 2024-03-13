@@ -83,11 +83,11 @@ class rewriter: public basic_rewriter<data_expression>
     // cache the empty substitution, since it is expensive to construct
     static substitution_type& empty_substitution()
     {
-#ifdef MCRL2_THREAD_SAFE 
-      static_assert(atermpp::detail::GlobalThreadSafe);
+#ifdef MCRL2_ENABLE_MULTITHREADING 
+      static_assert(mcrl2::utilities::detail::GlobalThreadSafe);
       thread_local substitution_type result;
 #else
-      static_assert(!atermpp::detail::GlobalThreadSafe);
+      static_assert(!mcrl2::utilities::detail::GlobalThreadSafe);
       static substitution_type result;
 #endif
       assert(result.empty());    // This static substitution should always become empty again after use.

@@ -18,6 +18,7 @@ namespace core {
 namespace detail {
 
 std::vector<std::unique_ptr<atermpp::function_symbol>> function_symbols_DataAppl;
+atermpp::function_symbol function_symbols_DataApplFixed[DataApplFixed];
 
 } // namespace detail
 
@@ -105,11 +106,17 @@ const atermpp::function_symbol core::detail::function_symbols::SortCons = core::
   const atermpp::function_symbol core::detail::function_symbols::StateTrue = core::detail::function_symbol_StateTrue();
   const atermpp::function_symbol core::detail::function_symbols::StateFalse = core::detail::function_symbol_StateFalse();
   const atermpp::function_symbol core::detail::function_symbols::StateNot = core::detail::function_symbol_StateNot();
+  const atermpp::function_symbol core::detail::function_symbols::StateMinus = core::detail::function_symbol_StateMinus();
   const atermpp::function_symbol core::detail::function_symbols::StateAnd = core::detail::function_symbol_StateAnd();
   const atermpp::function_symbol core::detail::function_symbols::StateOr = core::detail::function_symbol_StateOr();
   const atermpp::function_symbol core::detail::function_symbols::StateImp = core::detail::function_symbol_StateImp();
+  const atermpp::function_symbol core::detail::function_symbols::StatePlus = core::detail::function_symbol_StatePlus();
+  const atermpp::function_symbol core::detail::function_symbols::StateConstantMultiply = core::detail::function_symbol_StateConstantMultiply();
+  const atermpp::function_symbol core::detail::function_symbols::StateConstantMultiplyAlt = core::detail::function_symbol_StateConstantMultiplyAlt();
   const atermpp::function_symbol core::detail::function_symbols::StateForall = core::detail::function_symbol_StateForall();
   const atermpp::function_symbol core::detail::function_symbols::StateExists = core::detail::function_symbol_StateExists();
+  const atermpp::function_symbol core::detail::function_symbols::StateInfimum = core::detail::function_symbol_StateInfimum();
+  const atermpp::function_symbol core::detail::function_symbols::StateSupremum = core::detail::function_symbol_StateSupremum();
   const atermpp::function_symbol core::detail::function_symbols::StateMust = core::detail::function_symbol_StateMust();
   const atermpp::function_symbol core::detail::function_symbols::StateMay = core::detail::function_symbol_StateMay();
   const atermpp::function_symbol core::detail::function_symbols::StateYaled = core::detail::function_symbol_StateYaled();
@@ -154,18 +161,26 @@ const atermpp::function_symbol core::detail::function_symbols::SortCons = core::
   const atermpp::function_symbol core::detail::function_symbols::PBESForall = core::detail::function_symbol_PBESForall();
   const atermpp::function_symbol core::detail::function_symbols::PBESExists = core::detail::function_symbol_PBESExists();
   const atermpp::function_symbol core::detail::function_symbols::PropVarInst = core::detail::function_symbol_PropVarInst();
-  const atermpp::function_symbol core::detail::function_symbols::BES = core::detail::function_symbol_BES();
-  const atermpp::function_symbol core::detail::function_symbols::BooleanEquation = core::detail::function_symbol_BooleanEquation();
-  const atermpp::function_symbol core::detail::function_symbols::BooleanVariable = core::detail::function_symbol_BooleanVariable();
-  const atermpp::function_symbol core::detail::function_symbols::BooleanTrue = core::detail::function_symbol_BooleanTrue();
-  const atermpp::function_symbol core::detail::function_symbols::BooleanFalse = core::detail::function_symbol_BooleanFalse();
-  const atermpp::function_symbol core::detail::function_symbols::BooleanNot = core::detail::function_symbol_BooleanNot();
-  const atermpp::function_symbol core::detail::function_symbols::BooleanAnd = core::detail::function_symbol_BooleanAnd();
-  const atermpp::function_symbol core::detail::function_symbols::BooleanOr = core::detail::function_symbol_BooleanOr();
-  const atermpp::function_symbol core::detail::function_symbols::BooleanImp = core::detail::function_symbol_BooleanImp();
-  const atermpp::function_symbol core::detail::function_symbols::BddTrue = core::detail::function_symbol_BddTrue();
-  const atermpp::function_symbol core::detail::function_symbols::BddFalse = core::detail::function_symbol_BddFalse();
-  const atermpp::function_symbol core::detail::function_symbols::BddIf = core::detail::function_symbol_BddIf();
+  const atermpp::function_symbol core::detail::function_symbols::PRES = core::detail::function_symbol_PRES();
+  const atermpp::function_symbol core::detail::function_symbols::PREqnSpec = core::detail::function_symbol_PREqnSpec();
+  const atermpp::function_symbol core::detail::function_symbols::PRInit = core::detail::function_symbol_PRInit();
+  const atermpp::function_symbol core::detail::function_symbols::PREqn = core::detail::function_symbol_PREqn();
+  const atermpp::function_symbol core::detail::function_symbols::PRESTrue = core::detail::function_symbol_PRESTrue();
+  const atermpp::function_symbol core::detail::function_symbols::PRESFalse = core::detail::function_symbol_PRESFalse();
+  const atermpp::function_symbol core::detail::function_symbols::PRESMinus = core::detail::function_symbol_PRESMinus();
+  const atermpp::function_symbol core::detail::function_symbols::PRESAnd = core::detail::function_symbol_PRESAnd();
+  const atermpp::function_symbol core::detail::function_symbols::PRESOr = core::detail::function_symbol_PRESOr();
+  const atermpp::function_symbol core::detail::function_symbols::PRESImp = core::detail::function_symbol_PRESImp();
+  const atermpp::function_symbol core::detail::function_symbols::PRESPlus = core::detail::function_symbol_PRESPlus();
+  const atermpp::function_symbol core::detail::function_symbols::PRESConstantMultiply = core::detail::function_symbol_PRESConstantMultiply();
+  const atermpp::function_symbol core::detail::function_symbols::PRESConstantMultiplyAlt = core::detail::function_symbol_PRESConstantMultiplyAlt();
+  const atermpp::function_symbol core::detail::function_symbols::PRESInfimum = core::detail::function_symbol_PRESInfimum();
+  const atermpp::function_symbol core::detail::function_symbols::PRESSupremum = core::detail::function_symbol_PRESSupremum();
+  const atermpp::function_symbol core::detail::function_symbols::PRESSum = core::detail::function_symbol_PRESSum();
+  const atermpp::function_symbol core::detail::function_symbols::PRESEqInf = core::detail::function_symbol_PRESEqInf();
+  const atermpp::function_symbol core::detail::function_symbols::PRESEqNInf = core::detail::function_symbol_PRESEqNInf();
+  const atermpp::function_symbol core::detail::function_symbols::PRESCondSm = core::detail::function_symbol_PRESCondSm();
+  const atermpp::function_symbol core::detail::function_symbols::PRESCondEq = core::detail::function_symbol_PRESCondEq();
 //--- end generated function symbol definitions ---//
 
 //--- start generated default value definitions ---//
@@ -248,11 +263,17 @@ const atermpp::aterm_appl core::detail::default_values::SortCons = core::detail:
   const atermpp::aterm_appl core::detail::default_values::StateTrue = core::detail::default_value_StateTrue();
   const atermpp::aterm_appl core::detail::default_values::StateFalse = core::detail::default_value_StateFalse();
   const atermpp::aterm_appl core::detail::default_values::StateNot = core::detail::default_value_StateNot();
+  const atermpp::aterm_appl core::detail::default_values::StateMinus = core::detail::default_value_StateMinus();
   const atermpp::aterm_appl core::detail::default_values::StateAnd = core::detail::default_value_StateAnd();
   const atermpp::aterm_appl core::detail::default_values::StateOr = core::detail::default_value_StateOr();
   const atermpp::aterm_appl core::detail::default_values::StateImp = core::detail::default_value_StateImp();
+  const atermpp::aterm_appl core::detail::default_values::StatePlus = core::detail::default_value_StatePlus();
+  const atermpp::aterm_appl core::detail::default_values::StateConstantMultiply = core::detail::default_value_StateConstantMultiply();
+  const atermpp::aterm_appl core::detail::default_values::StateConstantMultiplyAlt = core::detail::default_value_StateConstantMultiplyAlt();
   const atermpp::aterm_appl core::detail::default_values::StateForall = core::detail::default_value_StateForall();
   const atermpp::aterm_appl core::detail::default_values::StateExists = core::detail::default_value_StateExists();
+  const atermpp::aterm_appl core::detail::default_values::StateInfimum = core::detail::default_value_StateInfimum();
+  const atermpp::aterm_appl core::detail::default_values::StateSupremum = core::detail::default_value_StateSupremum();
   const atermpp::aterm_appl core::detail::default_values::StateMust = core::detail::default_value_StateMust();
   const atermpp::aterm_appl core::detail::default_values::StateMay = core::detail::default_value_StateMay();
   const atermpp::aterm_appl core::detail::default_values::StateYaled = core::detail::default_value_StateYaled();
@@ -297,18 +318,26 @@ const atermpp::aterm_appl core::detail::default_values::SortCons = core::detail:
   const atermpp::aterm_appl core::detail::default_values::PBESForall = core::detail::default_value_PBESForall();
   const atermpp::aterm_appl core::detail::default_values::PBESExists = core::detail::default_value_PBESExists();
   const atermpp::aterm_appl core::detail::default_values::PropVarInst = core::detail::default_value_PropVarInst();
-  const atermpp::aterm_appl core::detail::default_values::BES = core::detail::default_value_BES();
-  const atermpp::aterm_appl core::detail::default_values::BooleanEquation = core::detail::default_value_BooleanEquation();
-  const atermpp::aterm_appl core::detail::default_values::BooleanVariable = core::detail::default_value_BooleanVariable();
-  const atermpp::aterm_appl core::detail::default_values::BooleanTrue = core::detail::default_value_BooleanTrue();
-  const atermpp::aterm_appl core::detail::default_values::BooleanFalse = core::detail::default_value_BooleanFalse();
-  const atermpp::aterm_appl core::detail::default_values::BooleanNot = core::detail::default_value_BooleanNot();
-  const atermpp::aterm_appl core::detail::default_values::BooleanAnd = core::detail::default_value_BooleanAnd();
-  const atermpp::aterm_appl core::detail::default_values::BooleanOr = core::detail::default_value_BooleanOr();
-  const atermpp::aterm_appl core::detail::default_values::BooleanImp = core::detail::default_value_BooleanImp();
-  const atermpp::aterm_appl core::detail::default_values::BddTrue = core::detail::default_value_BddTrue();
-  const atermpp::aterm_appl core::detail::default_values::BddFalse = core::detail::default_value_BddFalse();
-  const atermpp::aterm_appl core::detail::default_values::BddIf = core::detail::default_value_BddIf();
+  const atermpp::aterm_appl core::detail::default_values::PRES = core::detail::default_value_PRES();
+  const atermpp::aterm_appl core::detail::default_values::PREqnSpec = core::detail::default_value_PREqnSpec();
+  const atermpp::aterm_appl core::detail::default_values::PRInit = core::detail::default_value_PRInit();
+  const atermpp::aterm_appl core::detail::default_values::PREqn = core::detail::default_value_PREqn();
+  const atermpp::aterm_appl core::detail::default_values::PRESTrue = core::detail::default_value_PRESTrue();
+  const atermpp::aterm_appl core::detail::default_values::PRESFalse = core::detail::default_value_PRESFalse();
+  const atermpp::aterm_appl core::detail::default_values::PRESMinus = core::detail::default_value_PRESMinus();
+  const atermpp::aterm_appl core::detail::default_values::PRESAnd = core::detail::default_value_PRESAnd();
+  const atermpp::aterm_appl core::detail::default_values::PRESOr = core::detail::default_value_PRESOr();
+  const atermpp::aterm_appl core::detail::default_values::PRESImp = core::detail::default_value_PRESImp();
+  const atermpp::aterm_appl core::detail::default_values::PRESPlus = core::detail::default_value_PRESPlus();
+  const atermpp::aterm_appl core::detail::default_values::PRESConstantMultiply = core::detail::default_value_PRESConstantMultiply();
+  const atermpp::aterm_appl core::detail::default_values::PRESConstantMultiplyAlt = core::detail::default_value_PRESConstantMultiplyAlt();
+  const atermpp::aterm_appl core::detail::default_values::PRESInfimum = core::detail::default_value_PRESInfimum();
+  const atermpp::aterm_appl core::detail::default_values::PRESSupremum = core::detail::default_value_PRESSupremum();
+  const atermpp::aterm_appl core::detail::default_values::PRESSum = core::detail::default_value_PRESSum();
+  const atermpp::aterm_appl core::detail::default_values::PRESEqInf = core::detail::default_value_PRESEqInf();
+  const atermpp::aterm_appl core::detail::default_values::PRESEqNInf = core::detail::default_value_PRESEqNInf();
+  const atermpp::aterm_appl core::detail::default_values::PRESCondSm = core::detail::default_value_PRESCondSm();
+  const atermpp::aterm_appl core::detail::default_values::PRESCondEq = core::detail::default_value_PRESCondEq();
   const atermpp::aterm_appl core::detail::default_values::SortExpr = core::detail::default_value_SortExpr();
   const atermpp::aterm_appl core::detail::default_values::SortConsType = core::detail::default_value_SortConsType();
   const atermpp::aterm_appl core::detail::default_values::DataExpr = core::detail::default_value_DataExpr();
@@ -325,8 +354,7 @@ const atermpp::aterm_appl core::detail::default_values::SortCons = core::detail:
   const atermpp::aterm_appl core::detail::default_values::ActionRenameRuleRHS = core::detail::default_value_ActionRenameRuleRHS();
   const atermpp::aterm_appl core::detail::default_values::FixPoint = core::detail::default_value_FixPoint();
   const atermpp::aterm_appl core::detail::default_values::PBExpr = core::detail::default_value_PBExpr();
-  const atermpp::aterm_appl core::detail::default_values::BooleanExpression = core::detail::default_value_BooleanExpression();
-  const atermpp::aterm_appl core::detail::default_values::BddExpression = core::detail::default_value_BddExpression();
+  const atermpp::aterm_appl core::detail::default_values::PRExpr = core::detail::default_value_PRExpr();
 //--- end generated default value definitions ---//
 
 } // namespace core

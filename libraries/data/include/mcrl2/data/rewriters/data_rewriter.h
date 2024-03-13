@@ -24,14 +24,14 @@ namespace detail {
 template <typename DataRewriter, typename SubstitutionFunction>
 data::data_expression data_rewrite(const data::data_expression& x, const DataRewriter& R, SubstitutionFunction& sigma)
 {
-  mCRL2log(log::debug2) << "data_rewrite " << x << sigma << " -> " << R(x, sigma) << std::endl;
+  mCRL2log(log::trace) << "data_rewrite " << x << sigma << " -> " << R(x, sigma) << std::endl;
   return R(x, sigma);
 }
 
 template <typename DataRewriter>
 data::data_expression data_rewrite(const data::data_expression& x, const DataRewriter& R, data::no_substitution&)
 {
-  mCRL2log(log::debug2) << "data_rewrite " << x << "[]" << " -> " << R(x) << std::endl;
+  mCRL2log(log::trace) << "data_rewrite " << x << "[]" << " -> " << R(x) << std::endl;
   return R(x);
 }
 
@@ -55,6 +55,13 @@ struct add_data_rewriter: public Builder<Derived>
   {
     return data_rewrite(x, R, sigma);
   }
+
+  template <class T>
+  void apply(T& result, const data::data_expression& x)
+  {
+    result = data_rewrite(x, R, sigma);
+  }
+
 };
 
 template <typename Derived, typename DataRewriter, typename SubstitutionFunction>

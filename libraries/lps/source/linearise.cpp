@@ -306,7 +306,7 @@ class specification_basic_type
     template <class Expression, class Substitution>
     Expression replace_variables_capture_avoiding_alt(const Expression& e, Substitution& sigma)
     {
-      return data::replace_variables_capture_avoiding_with_an_identifier_generator(e, sigma, fresh_identifier_generator);
+      return process::replace_variables_capture_avoiding_with_an_identifier_generator(e, sigma, fresh_identifier_generator);
     }
 
 
@@ -1482,9 +1482,8 @@ class specification_basic_type
       const process_expression& p)
     {
       /* This function replaces the variables in sumvars
-         by unique ones if these variables occur in occurvars
-         or occurterms. It extends rename_vars and rename
-         terms to rename the replaced variables to new ones. */
+         by unique ones if these variables occur in the process expression p.
+         The substitution sigma contains the renaming. */
       variable_vector newsumvars;
 
       for (const variable& var: sumvars)
@@ -2027,7 +2026,7 @@ class specification_basic_type
 
         return stochastic_operator(
                             sumargs,
-                            replace_variables_capture_avoiding_alt(sto.distribution(),sigma),
+                            replace_variables_capture_avoiding_alt(sto.distribution(),local_sigma),
                             substitute_pCRLproc(sto.operand(),local_sigma));
       }
 
@@ -2908,11 +2907,14 @@ class specification_basic_type
         variable_list stochvars=sto.variables();
         maintain_variables_in_rhs< mutable_map_substitution<> > sigma;
         alphaconvert(stochvars,sigma,variable_list(), data_expression_list({ condition }));
+
         return stochastic_operator(
                  stochvars,
-                 replace_variables_capture_avoiding_alt(
+                 if_(condition,
+                        replace_variables_capture_avoiding_alt(
                                                sto.distribution(),
                                                sigma),
+                        if_(variables_are_equal_to_default_values(stochvars),real_one(),real_zero())),
                  distribute_condition(
                        substitute_pCRLproc(sto.operand(),sigma),
                        condition));
@@ -6183,10 +6185,12 @@ class specification_basic_type
       data_expression binarysumcondition;
       int equaluptillnow=1;
 
+      std::set<variable> all_sum_variables;
       for (const stochastic_action_summand& smmnd: action_summands)
       {
         const variable_list sumvars=smmnd.summation_variables();
         resultsum=merge_var(sumvars,resultsum,rename_list_pars,rename_list_args,conditionlist,parameters);
+        all_sum_variables.insert(sumvars.begin(),sumvars.end());
       }
 
       if (options.binary)
@@ -6517,7 +6521,8 @@ class specification_basic_type
         {
           const variable_list stochastic_vars=smmnd.distribution().variables();
           resulting_stochastic_variables=merge_var(stochastic_vars,resulting_stochastic_variables,
-                              stochastic_rename_list_pars,stochastic_rename_list_args,stochastic_conditionlist,parameters);
+                              stochastic_rename_list_pars,stochastic_rename_list_args,stochastic_conditionlist,
+                              parameters + variable_list(all_sum_variables.begin(),all_sum_variables.end()));
         }
 
         std::vector < variable_list >::const_iterator auxrename_list_pars=rename_list_pars.begin();
@@ -9212,6 +9217,7 @@ class specification_basic_type
 
         objectdatatype& object=objectIndex(process_instance_assignment(t).identifier());
 
+        // Now apply the assignment in this process to the obtained initial process and the distribution. 
         maintain_variables_in_rhs<mutable_map_substitution<> > sigma;
         for (const assignment& a: process_instance_assignment(t).assignments())
         {
@@ -9219,6 +9225,10 @@ class specification_basic_type
         }
 
         init=replace_variables_capture_avoiding_alt(init,sigma);
+        initial_stochastic_distribution = 
+                   stochastic_distribution(
+                         initial_stochastic_distribution.variables(),
+                         replace_variables_capture_avoiding_alt(initial_stochastic_distribution.distribution(), sigma));
 
         // Make the bound variables and parameters in this process unique.
 
@@ -9437,7 +9447,9 @@ class specification_basic_type
     /* The result are a list of action summands, deadlock summand, the parameters of this
        linear process and its initial values. A initial stochastic distribution that must
        precede the initial linear process and the ultimate delay condition of this
-       linear process that can be used or be ignored. */
+       linear process that can be used or be ignored. 
+
+    */
 
     void generateLPEmCRL(
       stochastic_action_summand_vector& action_summands,
@@ -9880,26 +9892,35 @@ class specification_basic_type
           
           const variable_list relevant_stochastic_variables=parameters_that_occur_in_body(sto.variables(),object.processbody);
           assert(relevant_stochastic_variables.size()<=new_parameters.size());
+          // The variables in sto.variables() may clash with local variables u and therefore need to be rename.
+          variable_list renamed_sto_variables=sto.variables();
+          mutable_indexed_substitution<> local_sigma1;
+          alphaconvertprocess(renamed_sto_variables, local_sigma1, t);
+          
+
           variable_list::const_iterator i=new_parameters.begin();
           for(const variable& v: relevant_stochastic_variables)
           {
-            new_assignments=push_back(new_assignments,assignment(*i,v));
+            new_assignments=push_back(new_assignments,assignment(*i,local_sigma1(v)));
             i++;
           }
+          data_expression new_distribution = data::replace_variables_capture_avoiding(sto.distribution(),local_sigma1);
+
           // Some of the variables may occur only in the distribution, which is now moved out.
           // Therefore, the assignments must be filtered.
           new_assignments=filter_assignments(new_assignments + u.assignments(),object.parameters);
 
+          // The variables bound in the distribution may conflict 
+
           // Furthermore, the old assignment must be applied to the distribution, when it is moved
           // outside of the process body.
-          maintain_variables_in_rhs< mutable_map_substitution<> > local_sigma;
+          mutable_indexed_substitution<> local_sigma;
           for(const assignment& a:u.assignments())
           {
             local_sigma[a.lhs()]=a.rhs();
           }
-          return stochastic_operator(sto.variables(),
-                                     replace_variables_capture_avoiding_alt(sto.distribution(),
-                                                                              local_sigma),
+          return stochastic_operator(renamed_sto_variables,
+                                     data::replace_variables_capture_avoiding(new_distribution, local_sigma),
                                      process_instance_assignment(new_identifier,new_assignments));
         }
         return t;
@@ -10038,8 +10059,8 @@ class specification_basic_type
           return stochastic_operator(r.variables(),
                                      r.distribution(),
                                      sum(s.variables(),r.operand()));
-         }
-        return t;
+        }
+        return sum(s.variables(),r_);
       }
 
       if (is_stochastic_operator(t))
