@@ -1232,8 +1232,7 @@ void bisimulation_reduce_martens(LTS_TYPE& l, bool const branching = true, //Do 
     bisim_partitioner_martens<LTS_TYPE> bisim_part(l);
     // Assign the reduced LTS
     //bisim_part.finalize_minimized_LTS();
-    mCRL2log(mcrl2::log::info) << "Number of states after minimization: " << l.num_states() << std::endl;
-    assert( false );
+    mCRL2log(mcrl2::log::info) << "Number of states after minimization: " << bisim_part.num_eq_classes() << std::endl;
 }
 
 

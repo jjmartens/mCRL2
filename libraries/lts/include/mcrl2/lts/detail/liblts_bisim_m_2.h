@@ -104,18 +104,18 @@ public:
       blocks[i] = 0;
     }
 
-    block_map.insert(std::pair(0, b0));
+    block_map[0] = b0;
     //initialize worklist
     worklist.push(0);
 
     //Initialize state2loc and loc2state
-    for (std::size_t i = 0; i < aut.num_states(); ++i)
+    for (std::size_t i = 0; i < (unsigned int) aut.num_states(); ++i)
     {
       state2loc[i] = i;
       loc2state[i] = i;
     }
     // Mark dirty bottom states
-    for (std::size_t i= 0; i < aut.num_states(); ++i)
+    for (std::size_t i = 0; i < (unsigned int) aut.num_states(); ++i)
     {
       if (sil_suc[i].empty()) {
         mark_dirty(i);
@@ -147,7 +147,7 @@ public:
    */
   std::size_t num_eq_classes() const
   {
-    return max_state_index;
+    return block_map.size();
   }
 
 
@@ -294,6 +294,9 @@ private:
   {
     mCRL2log(mcrl2::log::debug) << "swap_to_dirty " << s << std::endl;
     block_type Bid = blocks[s];
+    if (block_map.find(Bid) == block_map.end()) {
+      mCRL2log(mcrl2::log::info) << "Block not found !?" << s << ":" << Bid << std::endl;
+    }
     block B = block_map[Bid];
     state_type loc = state2loc[s];
     if (loc < B.start || loc > B.end) {
@@ -374,7 +377,8 @@ private:
     std::map<signature_type, block_type> sig2block;
 #endif
     int j = 0;
-    block_type* state2block = new block_type[B.end - B.mid];
+    std::vector<block_type> state2block = std::vector<block_type>(aut.num_states(), 0);
+
     mCRL2log(mcrl2::log::debug) << "Computing signatures from here. "<< Bid << ":" << B.start <<  " : " << B.mid << " : " << B.end << std::endl;
 
     //Add signature of one clean state
@@ -404,7 +408,7 @@ private:
       sig(s, signature, sigs, Bid);
       mCRL2log(mcrl2::log::debug) << "sig comped" << s << std::endl;
 
-      sigs.insert(std::make_pair(s, signature));
+      sigs[s] = signature;
       auto ret = sig2block.insert(std::make_pair(signature, j));
       if (ret.second) {
         j += 1;
@@ -421,10 +425,7 @@ private:
           marked[t].insert(s);
           mCRL2log(mcrl2::log::debug) << "removing premark: " << t << ":" << loc2state[s] << std::endl;
           if(pre_marked[t].empty()) {
-            mCRL2log(mcrl2::log::debug) << "4";
-            mCRL2log(mcrl2::log::debug) << "bfdrty: " << t << std::endl;
             swap_to_dirty(t);
-            mCRL2log(mcrl2::log::debug) << "ftrdrty: " << t << std::endl;
           }
           mCRL2log(mcrl2::log::debug) << "5";
         }
@@ -521,7 +522,7 @@ private:
       loc2state[tmp] = si;
       state2loc[si] = tmp;
     }
-
+    delete[] dirty;
     // create new blocks
     state_type old_start = B.mid;
     state_type old_end = B.end;
@@ -536,34 +537,35 @@ private:
 
       assert(newstart >= old_start);
       assert(newend <= old_end);
-      if (i == max_index) {
+      if (i == max_index)
+      {
         B.start = newstart;
         B.mid = newend;
         B.end = newend;
-        // B.unstable_labels = std::unordered_set<label_type>();
         block_map[Bid] = B;
-      }
-      else {
+      } else {
         block_type newBid = block_map.size();
-        block newB = block{ newstart, newend, newend };// std::unordered_set<label_type>()
-        block_map.insert(std::pair<block_type, block>(newBid, newB));
+        block newB = block{ newstart, newend, newend };
+        block_map[newBid] = newB;
         for (state_type locs = newB.start; locs < newB.end; locs++)
         {
           blocks[loc2state[locs]] = newBid;
         }
       }
     }
+    mCRL2log(mcrl2::log::debug) << "blocks? " <<  block_map.size() <<  std::endl;
     // Done with rearranging states
     // Output partition for debug purposes.
     mCRL2log(mcrl2::log::debug) << "Done rearranging states." << std::endl;
-    for(state_type i = 0; i < aut.num_states(); i++)
+    for (state_type i = 0; i < (unsigned int) aut.num_states(); i++)
     {
       mCRL2log(mcrl2::log::debug) << "\t loc:" << i << ":" << state2loc[loc2state[i]] <<":" << loc2state[i] << " " << blocks[loc2state[i]] << std::endl;
     }
     delete[] Sizes;
+    /* delete[] Sizes;
     delete[] dirty;
-    delete[] state2block;
-    return block_map.size();
+    delete[] state2block;*/
+    return j;
 }
 
   //Refine based on sigs
@@ -592,7 +594,7 @@ private:
         mCRL2log(mcrl2::log::debug) << "start iter" << std::endl;
 
         old_blocks = block_map.size();
-        split(Bid);
+        int ret = split(Bid);
         mCRL2log(mcrl2::log::debug) << "new blocks created = " << block_map.size() - old_blocks << std::endl;
 
 
@@ -604,7 +606,7 @@ private:
 
         if(old_blocks != block_map.size()) {
           // Mark every bottom state dirty.
-          for (std::size_t i = 0; i < aut.num_states(); ++i)
+          for (std::size_t i = 0; i < (unsigned int) aut.num_states(); ++i)
           {
             bool bottom = true;
             for (auto t : sil_suc[i]) {
