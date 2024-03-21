@@ -87,7 +87,6 @@ public:
         sil_pred[(*r).to()].insert((*r).from());
         sil_suc[(*r).from()].insert((*r).to());
       }
-      mCRL2log(mcrl2::log::debug) << "transition " << (*r).from() << " " << (*r).label() << " " << (*r).to() << std::endl;
     }
     //Initialize block map
     worklist = std::queue<block_type>();
@@ -105,8 +104,6 @@ public:
 
     block b0;
     b0.states = allstates;
-    b0.dirty_states = allstates;
-    b0.frontier = bottomstates;
 
     block_map[0] = b0;
     //initialize worklist
@@ -115,7 +112,7 @@ public:
     // Mark dirty bottom states
     for (state_type s : b0.states) {
       if (sil_suc[s].empty()) {
-        b0.dirty_states.insert(s);
+        mark_dirty(s);
       }
     }
 
@@ -160,7 +157,6 @@ public:
    *  \retval false otherwise. */
   bool in_same_class(const std::size_t s, const std::size_t t) const
   {
-    mCRL2log(mcrl2::log::debug) << "in_same_class " << s << " " << t << " " << get_eq_class(s) << " " << get_eq_class(t) << std::endl;
     return get_eq_class(s) == get_eq_class(t);
   }
 
@@ -168,7 +164,7 @@ private:
   typedef std::size_t state_type;
   typedef std::size_t label_type;
   typedef std::size_t block_type;
-  typedef std::pair<label_type, block_type> observation_type;
+  typedef std::tuple<block_type, label_type, block_type> observation_type;
   typedef std::pair<label_type, state_type> custom_transition_type;
 
   //Typedef for signature
@@ -200,16 +196,17 @@ private:
     //std::unordered_set<label_type> unstable_labels;
     std::set<state_type> states;
     std::set<state_type> dirty_states;
-    std::set<state_type> frontier; 
   };
 
   block_type* blocks;
   std::map<block_type, block> block_map;
+  std::set<state_type> frontier;
+ 
   //state_type* loc2state;
   //state_type* state2loc;
   std::set<state_type>* sil_pred;
   std::set<state_type>* sil_suc;
-  
+  std::map<state_type, std::size_t> state2numdirtysuc;
   //Implement this later.
   //std::size_t* state2silentout;
   //std::size_t* state2silentin;
@@ -220,14 +217,16 @@ private:
   { 
     for (auto spre : sil_pred[s])
     {
-      if (blocks[spre] == blocks[s])
+      state2numdirtysuc[spre] += 1;
+      if (!block_map[blocks[spre]].dirty_states.insert(spre).second)
       {
-        if (!block_map[blocks[s]].dirty_states.insert(spre).second)
-        {
-          //The state was already dirty, so we remove it from the frontier
-          block_map[blocks[s]].frontier.erase(spre);
-          mark_dirty_backwards_closure(spre);
-        }
+        //The state was already dirty, so we remove it from the frontier
+        frontier.erase(spre);
+      }
+      else
+      {
+        //The state was not dirty, so we compute reverse closure.
+        mark_dirty_backwards_closure(spre);
       }
     }
   }
@@ -235,198 +234,149 @@ private:
   void mark_dirty(state_type s)
   {
     //Add to frontier if no silent marked state
-    block* Bid = &block_map[blocks[s]];
-    if (Bid->dirty_states.insert(s).second)
+    block* B = &block_map[blocks[s]];
+    if (B->dirty_states.insert(s).second)
     {
       //The state was not dirty, so we add it to the frontier and compute reverse closure.
-      if (Bid->frontier.empty()) {
-        //First dirty state, so we add it to the worklist
-        worklist.push(blocks[s]);
-      }
-      Bid->frontier.insert(s);
+      frontier.insert(s);
       mark_dirty_backwards_closure(s);
     }
   }
 
   //Signature of a state
-  void sig(const state_type& s, signature_type& retsignature, std::map<state_type, signature_type>& sigs, block_type curblock)
+  void sig(const state_type& s, signature_type& retsignature, std::map<state_type, signature_type>& sigs)
   {
     for (auto t : suc[s])
     {
-      if (blocks[t.second] != curblock or !is_tau(t.first)) {
-        mCRL2log(mcrl2::log::debug) << "inserting " << t.first << " " << t.second << " in sig of " << s <<  std::endl;
-        retsignature.insert(std::make_pair(t.first, blocks[t.second]));
-        auto sig = std::make_pair(t.first, blocks[t.second]);
-        // Add observation of r to sig
-        retsignature.insert(sig);
+      if (!is_tau(t.first)) {
+        retsignature.insert(std::make_tuple(blocks[s], t.first, blocks[t.second]));
       }
-      else {
-        if (block_map[curblock].dirty_states.find(t.second) == block_map[curblock].dirty_states.end())
+      else
+      {
+        // Union with signature of t if signature is known
+        if (sigs.find(t.second) != sigs.end())
         {
-          retsignature.insert(std::make_pair(t.first, blocks[t.second]));
-          auto sig = std::make_pair(t.first, curblock);
-          // Add observation of r to sig curblock encodes it is able to go to old signature.
-          retsignature.insert(sig);
-        }
-        else
-        {
-          // If it is dirty, we should include the signature of the state t.
           retsignature.insert(sigs[t.second].begin(), sigs[t.second].end());
+        }
+        if (blocks[t.second] != blocks[s])
+        {
+          // If not silent add observation
+          retsignature.insert(std::make_tuple(blocks[s], t.first, blocks[t.second]));
         }
       }
     }
   }
 
   //Split block based on signature
-  int split(block_type Bid)
+  void split()
   {
-    block* B = &block_map[Bid];
-    if (B->frontier.empty())
+    if (frontier.empty())
     {
       //Block is clean (should not happen)
-      mCRL2log(mcrl2::log::debug) << "Block clean but in worklist!? should not happen." << std::endl;
-      return 0;
+      mCRL2log(mcrl2::log::debug) << "Partition clean!? should not happen." << std::endl;
+      return ;
     }
 #ifdef UORDERED
     std::unordered_map<signature_type, block_type, sigHash> sig2block;
 #else  
     std::map<signature_type, block_type> sig2block;
 #endif
-    int j = 0;
-    std::map<state_type, block_type> state2block;
-
-    mCRL2log(mcrl2::log::debug) << "Computing signatures from here. " << Bid << ": " << B->states.size() << " of whchi dirty: "
-                                << B->dirty_states.size() << std::endl;
-
-    for (auto s : B->states)
-    {
-      mCRL2log(mcrl2::log::debug) << "\tstate: " << s << " is vies: " << (B->dirty_states.find(s) != B->dirty_states.end()) << std::endl;
-    }
-    //Add signature of one clean state
+    mCRL2log(mcrl2::log::info) << "Start splitting" << std::endl;
     signature_type signature;
-    signature.insert(std::make_pair(0, Bid));
-    sig2block[signature] = 0;
-    j += 1;
-
-    //TODO: This might hit complexity, maybe we can improve this by juggling references to correct signatures?
+    // TODO: This might hit complexity, maybe we can improve this by juggling references to correct signatures?
     std::map<state_type, signature_type> sigs;
-
-    //Add signatures of dirty states
-    std::set<state_type> done;
-    while(!B->frontier.empty())
+    std::set<block_type> blocks_to_split;
+    while(!frontier.empty())
     {
-      state_type s = *(B->frontier.begin());
-      B->frontier.erase(s);
+      state_type s = *(frontier.begin());
+      frontier.erase(s);
       signature.clear();
-
-      sig(s, signature, sigs, Bid);
-      mCRL2log(mcrl2::log::debug) << "sig comped" << s << std::endl;
+      sig(s, signature, sigs);
       sigs[s] = signature;
-
-      auto ret = sig2block.insert(std::make_pair(signature, j));
-      if (ret.second) {
-        j += 1;
+      block* B = &block_map[blocks[s]];
+      B->dirty_states.erase(s);
+      if (B->dirty_states.empty())
+      {
+        blocks_to_split.insert(blocks[s]);
       }
-
-      done.insert(s);
       for (auto spre: sil_pred[s])
       {
-        if (blocks[spre] == Bid)
+        if (block_map[blocks[spre]].dirty_states.find(spre) != block_map[blocks[spre]].dirty_states.end())
         {
-          for (auto t : sil_suc[spre])
+          state2numdirtysuc[spre] -= 1;
+          if (state2numdirtysuc[spre] == 0)
           {
-            if (blocks[t] != Bid or (B->dirty_states.find(t) != B->dirty_states.end() and done.find(t) == done.end()))
-            {
-              break;
-            }
+            frontier.insert(spre);
           }
-          B->frontier.insert(spre);
         }
       }
-      state2block[s] = (*ret.first).second;
-      mCRL2log(mcrl2::log::debug) << "new block of state " << s << " is:" << state2block[s] << std::endl;
-    }
-   
-    if (j == 1) {
-      //Only one signature, no need to split
-      mCRL2log(mcrl2::log::debug) << "no new signatures." << std::endl;
-      return 0;
-    }
-    std::map<block_type, std::set<state_type>> block2sets;
-    std::set<state_type> og_states = B->states;
-    mCRL2log(mcrl2::log::debug) << "og states :" << og_states.size() << std::endl;
-    for (auto s : state2block)
-    {
-      block2sets[s.second].insert(s.first);    
-    }
-    std::set<state_type> nondirty_states = B->states;
-    // nondirty states
-    for (auto s : B->dirty_states)
-    {
-      nondirty_states.erase(s);
     }
 
-    block2sets[0] = nondirty_states;
-    // Find biggest block (argmax) 
-    std::size_t maxsize = nondirty_states.size();
-    block_type maxblock = 0;
-    for (auto b : block2sets)
+    for (auto b : blocks_to_split)
     {
-      if (b.second.size() > maxsize)
-      {
-        maxsize = b.second.size();
-        maxblock = b.first;
-      }
-    }
+      block* B = &block_map[b];
+      // Block is dirty
+      std::map<signature_type, block_type> sig2block;
+      std::map<state_type, block_type> state2block;
+      std::map<block_type, std::size_t> block2size;
 
-    // New blocks for each non maxblock
-    for (auto b : block2sets)
-    {
-      if (b.first != maxblock and b.second.size() != 0)
+      for (auto s : B->states)
       {
-        block_type newblock = block_map.size();
-        block Bnew;
-        Bnew.states = b.second;
-        Bnew.dirty_states = std::set<state_type>();
-        Bnew.frontier = std::set<state_type>();
-        for (auto s : b.second)
+        if (sigs.find(s) == sigs.end())
         {
-          blocks[s] = newblock;
+          // Clean state stays in old block count in 0;
+          block2size[0] += 1;
+          state2block[s] = 0;
         }
-        block_map[newblock] = Bnew;
-      }
-    }
-    // Biggest block will become the original block.
-
-    B->states.clear();
-    B->dirty_states.clear();
-    for (auto s : block2sets[maxblock])
-    {
-      B->states.insert(s);
-    }
-
-    // Compute silent transitions 
-    mCRL2log(mcrl2::log::debug) << "og states2 :" << og_states.size() << std::endl;
-    for (auto s : og_states)
-    {
-      std::set<state_type> sucs = sil_suc[s];
-      for (auto t : sucs)
-      {
-        if (blocks[t] != blocks[s])
+        else
         {
-          sil_suc[s].erase(t);
-          sil_pred[t].erase(s);
+          if (sig2block.find(sigs[s]) == sig2block.end())
+          {
+            block_type newblock_id = block_map.size();
+            block2size[newblock_id] = 0;
+            block newblock;
+            newblock.states = std::set<state_type>();
+            newblock.dirty_states = std::set<state_type>();
+            block_map[newblock_id] = newblock;
+            sig2block[sigs[s]] = newblock_id;
+          }
+          state2block[s] = sig2block[sigs[s]];
+          block2size[state2block[s]] += 1;
         }
       }
-      if (sil_suc[s].empty() and !sucs.empty())
+      // Split block
+      // argmax block2size
+      block_type maxblock = 0;
+      std::size_t maxsize = block2size[0];
+      for (auto b : block2size)
       {
-        // New bottom state, make it dirty. (maybe we can do this on the fly(inductive signatures?).)
-        mark_dirty(s);
+        if (b.second > maxsize)
+        {
+          maxsize = b.second;
+          maxblock = b.first;
+        }
+      }
+      if (block2size[0] == 0)
+      {
+        // No clean states, so we create 1 less block.
+        block_map.erase(block_map.size() -1);
+      }
+      
+      std::set<state_type> states = B->states;
+      for (auto s : states)
+      {
+        if (state2block[s] != maxblock)
+        {
+          block_type nbid = (state2block[s] == 0) ? maxblock: state2block[s];
+          nbid = (block2size[0] == 0 && nbid > maxblock) ? nbid - 1 : nbid;
+          block_map[nbid].states.insert(s);
+          B->states.erase(s);
+          blocks[s] = nbid;
+        }
       }
     }
-    mCRL2log(mcrl2::log::debug) << "Splitted the block:" << Bid << " into #newblocks" << j << std::endl;
-    return j;
-}
+    return;
+  }
 
   //Refine based on sigs
   void refine()
@@ -435,44 +385,25 @@ private:
     int new_blocks = 0;
     int old_blocks = 0;
     mCRL2log(mcrl2::log::info) << "Start refinement" << std::endl;
-    while (!worklist.empty())
+    while (!frontier.empty())
     {
-      iter += 1;
-      block_type Bid = worklist.front();
-      worklist.pop();
-      
-      // ideally this maybe should be a pointer??
-      block* B = &block_map[Bid];
-
-      //Count states
-      if (B->frontier.empty())
+      block_type old_blocks = block_map.size();
+      split();
+      block_type new_blocks = block_map.size(); 
+      for (block_type b = old_blocks; b < new_blocks; ++b)
       {
-        //Block is clean (should not happen)
-        mCRL2log(mcrl2::log::info) << "Block clean but in worklist!? should not happen." << std::endl;
-      } else {
-        mCRL2log(mcrl2::log::debug) << "start iter" << std::endl;
-        old_blocks = block_map.size();
-        int ret = split(Bid);
-        mCRL2log(mcrl2::log::info) << "new blocks created = " << block_map.size() - old_blocks << std::endl;
-        if (old_blocks != block_map.size())
+        for (auto s : block_map[b].states)
         {
-          //From all new blocks, mark backwards dirty. 
-          for (block_type i = old_blocks; i < block_map.size(); ++i)
+          for (auto t : pred[s])
           {
-            for (auto s : block_map[i].states)
+            if (!is_tau(t.first) or blocks[t.second] != b)
             {
-              for (auto trans: pred[s])
-              {
-                if (!is_tau(trans.first) or blocks[trans.second] != i)
-                {
-                  mCRL2log(mcrl2::log::debug) << "marking dirty" << std::endl;
-                  mark_dirty(trans.second);
-                } 
-              }
+              mark_dirty(t.second);
             }
           }
-        }  
+        }
       }
+      mCRL2log(mcrl2::log::info) << "New frontier starts with size: \"" << frontier.size() << "\"" << std::endl;
     }
     mCRL2log(mcrl2::log::info) << "Done total blocks: \"" << block_map.size() << "\"" << std::endl;
   }
