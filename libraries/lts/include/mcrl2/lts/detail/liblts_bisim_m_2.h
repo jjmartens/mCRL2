@@ -378,36 +378,34 @@ private:
            std::vector<block_type>& state2num,
       block& B)
   {
-    for (auto t : suc[s])
+    for (auto sit = 0; sit < trans_part[s].mid_suc; sit++)
     {
-      if (!is_tau(t.first) || blocks[t.second] != blocks[s]) {
+      custom_transition_type& t = suc[s][sit];
+      retsignature.push_back(std::make_pair(t.first, blocks[t.second]));
+    }
+    
+    for (auto sit = trans_part[s].mid_suc; sit < suc[s].size(); sit++)
+    {
+      // Loop through tau actions
+      custom_transition_type& t = suc[s][sit];
+      // Union with signature of t if signature is known
+      // TODO Double check, what if t.second is in same block, but was not dirty??.
+      if (blocks[t.second] != blocks[s])
+      {
+        // If not silent add observation
         retsignature.push_back(std::make_pair(t.first, blocks[t.second]));
       }
       else
       {
-        // Union with signature of t if signature is known
-        // TODO Double check, what if t.second is in same block, but was not dirty??.
-        if (blocks[t.second] != blocks[s])
+        // If silent, add signature of t
+        if (state2loc[t.second] >= B.mid)
         {
-          // If not silent add observation
-          retsignature.push_back(std::make_pair(t.first, blocks[t.second]));
-        } 
-        else
-        {
-          // If silent, add signature of t
-          if (state2loc[t.second] >= B.mid)
+          for (auto& obs : sigs[state2num[state2loc[t.second] - B.mid]])
           {
-            for (auto& obs : sigs[state2num[state2loc[t.second]-B.mid]])
-            {
-              retsignature.push_back(obs);
-            }
-          }
-          else
-          {
-            // TODO: Do we want to do this??
-            //retsignature.insert(std::make_pair(t.first, blocks[t.second]));
+            retsignature.push_back(obs);
           }
         }
+        // Maybe add silent to clean(?)
       }
     }
   }
