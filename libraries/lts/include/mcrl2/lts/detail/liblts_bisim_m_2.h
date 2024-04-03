@@ -105,7 +105,7 @@ public:
 
     //Initialize block map
     worklist = std::deque<block_type>();
-    block_map = std::map<block_type, block>();
+    block_map = std::vector<block>();
 
     block b0;
     b0.end = aut.num_states();
@@ -113,7 +113,7 @@ public:
     b0.mid = aut.num_states();
     b0.frontier = aut.num_states();
 
-    block_map[0] = b0;
+    block_map.push_back(b0);
     //initialize worklist
     // Mark dirty bottom states, TODO: do this in the first initialization loop
     for (state_type s = 0; s < aut.num_states(); s++)
@@ -229,7 +229,7 @@ private:
   };
 
   block_type* blocks;
-  std::map<block_type, block> block_map; //TODO: change to vector
+  std::vector<block> block_map; //TODO: change to vector
   //std::set<state_type> frontier;
   std::vector<trans_info> trans_part;
   //std::map<state_type, std::size_t> state2numdirtysuc; // NOOP!!!
@@ -343,7 +343,7 @@ private:
       else
       {
         // TODO: Is this necessary? It seems to be necessary (we can go silently through the large part?).
-        mark_dirty(spre);
+        //mark_dirty(spre);
       }
     }
   }
@@ -366,6 +366,39 @@ private:
     }
   }
 
+  //Check if sig1 has a observation not in sig2. both signatures are sorted.
+  bool is_sig_subset(signature_type& sig1, signature_type& sig2, block_type t)
+  {
+    auto it1 = sig1.begin();
+    auto it2 = sig2.begin();
+    while (it1 != sig1.end())
+    {
+      if (it1->second == t)
+      {
+        it1++;
+        continue;
+      }
+      if (it2 == sig2.end())
+      {
+        return false;
+      }
+      if (*it1 < *it2)
+      {
+        return false;
+      }
+      if (*it1 == *it2)
+      {
+        it1++;
+        it2++;
+      }
+      else
+      {
+        it2++;
+      }
+    }
+    return true;
+  }
+
   bool is_bottom(state_type s)
   {
     return (trans_part[s].silent_suc == suc[s].size());
@@ -376,7 +409,8 @@ private:
            signature_type& retsignature,
            std::vector<signature_type>& sigs,
            std::vector<block_type>& state2num,
-      block& B)
+      block& B
+  , std::vector<block_type>& retnums_to_add)
   {
     for (auto sit = 0; sit < trans_part[s].mid_suc; sit++)
     {
@@ -397,18 +431,22 @@ private:
       }
       else
       {
-        // If silent, add signature of t
+        // If silent and dirty, add signature of t
         if (state2loc[t.second] >= B.mid)
         {
-          for (auto& obs : sigs[state2num[state2loc[t.second] - B.mid]])
-          {
-            retsignature.push_back(obs);
-          }
+          retnums_to_add.push_back(block_map.size() + state2num[state2loc[t.second] - B.mid]);
+          retsignature.push_back(std::make_pair(t.first, block_map.size() + state2num[state2loc[t.second] - B.mid]));
+        } 
+        else
+        {
+          retsignature.push_back(std::make_pair(t.first, blocks[t.second]));
         }
-        // Maybe add silent to clean(?)
+        // else ? silent to clean ( is this important )??!? need some theory for this. 
       }
     }
   }
+
+  //Renumber states based on signature
   std::vector<block_type> renumber(std::vector<block_type>& state2num, block_type max, block_type B)
   {
     //Count occurences of each number:
@@ -468,8 +506,7 @@ private:
       //mCRL2log(mcrl2::log::debug) << "new block:" << i << "->" << block_map.size()
       //                            << "start : " << newblock.start << " end : " << newblock.end 
       //                            << " mid: " << newblock.mid << " frontier : " << newblock.frontier << std::endl;
-
-      block_map[block_map.size()] = newblock;
+      block_map.push_back(newblock);
     }
 
     // Move clean states if necessary
@@ -482,7 +519,8 @@ private:
         //new block 
         block_type target = oldnumblocks + maxblock - 1;
         blocks[s] = target;
-        mCRL2log(mcrl2::log::debug) << "cstate:" << s << " block:" << blocks[s] << "loc:" << block2sizesum[maxblock] - 1 << std::endl;
+        /* mCRL2log(mcrl2::log::debug) << "cstate:" << s << " block:" << blocks[s]
+                                         << "loc:" << block2sizesum[maxblock] - 1 << std::endl;*/
         location_type new_loc = block2sizesum[maxblock] - 1;
         block2sizesum[maxblock] -= 1;
         loc2state[new_loc] = s;
@@ -497,9 +535,9 @@ private:
       block_type target = label2realblock(ssigs.second, B, maxblock, oldnumblocks, remove);
       blocks[s] = target;
       block_type sizetarget = (ssigs.second == maxblock) ? 0 : ssigs.second;
-      mCRL2log(mcrl2::log::debug) << "state:" << s << " block:" << blocks[s] 
+      /* mCRL2log(mcrl2::log::debug) << "state:" << s << " block:" << blocks[s] 
                                   << "loc:" << block2sizesum[sizetarget] - 1
-                                  << std::endl;
+                                  << std::endl;*/
 
       location_type new_loc = block2sizesum[sizetarget] - 1;
       block2sizesum[sizetarget] -= 1;
@@ -543,24 +581,40 @@ private:
         mCRL2log(mcrl2::log::error) << "state was not yet ready to be processed" << std::endl;
       }
       state_type s = loc2state[locs-1];
-      mCRL2log(mcrl2::log::debug) << "loc:" << locs - 1 << " state: " << s
-                                  << " block: " << blocks[s] << std::endl;
+      /* mCRL2log(mcrl2::log::debug) << "loc:" << locs - 1 << " state: " << s
+                                  << " block: " << blocks[s] << std::endl;*/
 
       signature.clear();
-      signature.reserve(suc[s].size());
+      signature.reserve(suc[s].size()); //Only silent actions, bench if this is faster?
+      std::vector<state_type> retnums_to_add;
 
-      sig(s, signature, num2sig, state2num, (*B));
+      sig(s, signature, num2sig, state2num, (*B), retnums_to_add);
 
       std::sort(signature.begin(), signature.end());
       auto last = std::unique(signature.begin(), signature.end());
       signature.erase(last, signature.end());
-      if (sig2num.find(signature)== sig2num.end())
+      
+      for (auto& t: retnums_to_add)
       {
+        // Inductive signature trick.
+        if (is_sig_subset(signature, num2sig[t-block_map.size()], t))
+        {
+          signature = num2sig[t-block_map.size()]; //Minus T ...
+          break;
+        }
+      }
+
+      auto ret = sig2num.insert(std::make_pair(signature, j));
+      if (ret.second)
+      {
+        // New signature
         sig2num[signature] = j;
         num2sig.push_back(signature);
         j += 1; 
       }
-      state2num[locs - B->mid - 1] = sig2num[signature]; 
+
+      state2num[locs - B->mid - 1] = ret.first->second; 
+      
       for (auto sit = trans_part[s].mid_pred; sit < pred[s].size(); sit++)
       {
         state_type spre = pred[s][sit].second;
@@ -606,7 +660,12 @@ private:
       split(b);
       // update dirty states.
       block_type new_blocks = block_map.size(); 
-      mCRL2log(mcrl2::log::debug) << "old_blocks:" << old_blocks << " new_blocks:" << new_blocks << std::endl;
+      if (new_blocks == old_blocks)
+      {
+        mCRL2log(mcrl2::log::debug) << "No split: old_blocks:" << old_blocks << " new_blocks:" << new_blocks << std::endl;
+        mCRL2log(mcrl2::log::debug) << "block of size: " << block_map[b].end - block_map[b].start << std::endl;
+      }
+
       for (block_type b = old_blocks; b < new_blocks; ++b)
       {
         std::vector<state_type> states(&loc2state[block_map[b].start], &loc2state[block_map[b].end]);
