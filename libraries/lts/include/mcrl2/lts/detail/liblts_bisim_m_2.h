@@ -46,7 +46,15 @@ public:
   {
 
     const std::vector<transition>& trans = aut.get_transitions();
+    // Time this operation 
+    auto startsort = std::chrono::high_resolution_clock::now();
+    std::sort(aut.get_transitions().begin(), aut.get_transitions().end());
+    auto stopsort = std::chrono::high_resolution_clock::now();
+    auto sortduration = std::chrono::duration_cast<std::chrono::milliseconds>(stopsort - startsort);
+    std::cout << "sort:" << sortduration.count() << std::endl;
+    
 
+    auto startinit = std::chrono::high_resolution_clock::now();
     //Initialize arrays for pred and suc, 
     pred = new std::vector<custom_transition_type>[aut.num_states()];
     suc = new std::vector<custom_transition_type>[aut.num_states()];
@@ -65,6 +73,7 @@ public:
     mCRL2log(mcrl2::log::debug) << "start moving transitions " << std::endl;
     for (auto r = trans.begin(); r != trans.end(); r++)
     {
+      mCRL2log(mcrl2::log::debug) << r->to() << "- " << r->label() << " ->" << r->to() << std::endl;
       state2in[(*r).to()] += 1;
       state2out[(*r).from()] += 1;
     }
@@ -83,11 +92,16 @@ public:
       blocks[s] = 0;
     }
 
+    auto middleinit = std::chrono::high_resolution_clock::now();
+    auto durationminit = std::chrono::duration_cast<std::chrono::milliseconds>(middleinit - startinit);
+    std::cout << "m_init:" << durationminit.count() << std::endl;
+
+
     for (auto r = trans.begin(); r != trans.end(); r++)
     {
-      state_type from = (*r).from();
-      state_type to = (*r).to();
-      if (!is_tau((*r).label()))
+      state_type from = r->from();
+      state_type to = r->to();
+      if (!is_tau(r->label()))
       {
         pred[to][trans_part[to].mid_pred] = std::make_pair((*r).label(), (*r).from());
         trans_part[to].mid_pred += 1;
@@ -126,6 +140,9 @@ public:
         mark_dirty(s);
       }
     }
+    auto endinit = std::chrono::high_resolution_clock::now();
+    auto durationinit = std::chrono::duration_cast<std::chrono::milliseconds>(endinit - startinit);
+    std::cout << "init:" << durationinit.count() << std::endl;
 
     auto start = std::chrono::high_resolution_clock::now();
     // Iterate refinement 
@@ -133,7 +150,7 @@ public:
 
     auto stop = std::chrono::high_resolution_clock::now();
     auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(stop - start);
-    mCRL2log(mcrl2::log::info) << "Done s:" << duration.count() << std::endl;
+    std::cout << duration.count() << ":" << block_map.size() << std::endl;
     //cleanup
     delete[] pred;
     delete[] suc;
@@ -587,6 +604,7 @@ private:
       signature.clear();
       signature.reserve(suc[s].size()); //Only silent actions, bench if this is faster?
       std::vector<state_type> retnums_to_add;
+      retnums_to_add.reserve(suc[s].size());
 
       sig(s, signature, num2sig, state2num, (*B), retnums_to_add);
 
@@ -651,7 +669,6 @@ private:
     int iter = 0;
     int new_blocks = 0;
     int old_blocks = 0;
-    mCRL2log(mcrl2::log::info) << "Start refinement" << std::endl;
     while (!worklist.empty())
     {
       block_type b = worklist.back();
@@ -683,7 +700,6 @@ private:
       }
       iter += 1;
     }
-    mCRL2log(mcrl2::log::info) << "Done total blocks: \"" << block_map.size() << "\"" << std::endl;
   }
 };
 }
