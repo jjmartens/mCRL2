@@ -3555,9 +3555,16 @@ class bisim_partitioner_dnj
         branching(new_branching),
         preserve_divergence(new_preserve_divergence)
     {                                                                           assert(branching || !preserve_divergence);
+        //JM: Timing of init vs refining;
+        auto start = std::chrono::high_resolution_clock::now();
         create_initial_partition();                                             ONLY_IF_DEBUG( part_tr.action_block_orig_inert_begin =
                                                                                                                             part_tr.action_block_inert_begin; )
-        refine_partition_until_it_becomes_stable();
+        auto mid = std::chrono::high_resolution_clock::now();
+        mCRL2log(mcrl2::log::info) << "Init:" << std::chrono::duration_cast<std::chrono::milliseconds>(mid - start).count() << std::endl;
+         refine_partition_until_it_becomes_stable();
+         auto end = std::chrono::high_resolution_clock::now();
+         mCRL2log(mcrl2::log::info) << "Refine:" << std::chrono::duration_cast<std::chrono::milliseconds>(end - mid).count() << std::endl;
+         mCRL2log(mcrl2::log::info) << "Num states:" << num_eq_classes() << std::endl;
     }
 
 
@@ -5509,7 +5516,7 @@ void bisimulation_reduce_dnj(LTS_TYPE& l, bool const branching = false,
                                                           preserve_divergence);
     auto stop = std::chrono::high_resolution_clock::now();
     auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(stop - start);
-    mCRL2log(mcrl2::log::info) << "Time for bisimulation reduction: " << duration.count() << "ms\n";
+    mCRL2log(mcrl2::log::info) << "Total time: " << duration.count() << "ms\n";
     // Assign the reduced LTS
     bisim_part.finalize_minimized_LTS();
 }

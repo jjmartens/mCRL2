@@ -1213,7 +1213,7 @@ bool destructive_bisimulation_compare_martens(
 }
 
 template <class LTS_TYPE>
-void bisimulation_reduce_martens(LTS_TYPE& l, bool const branching = true, //Do not commit this true.
+void bisimulation_reduce_martens(LTS_TYPE& l, bool const branching = false, //Do not commit this true.
     bool const preserve_divergence = false)
 {
     if (1 >= l.num_states())
@@ -1221,12 +1221,11 @@ void bisimulation_reduce_martens(LTS_TYPE& l, bool const branching = true, //Do 
         
     }
     // Line 2.1: Find tau-SCCs and contract each of them to a single state
-
     if (branching)
     {
       scc_reduce(l, false);
     }
-
+    mCRL2log(mcrl2::log::info) << "flagging: " << std::endl;
     // Now apply the branching bisimulation reduction algorithm.  If there
     // are no taus, this will automatically yield strong bisimulation.
     bisim_partitioner_martens<LTS_TYPE> bisim_part(l);
