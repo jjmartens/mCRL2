@@ -68,19 +68,21 @@ public:
     std::size_t num_labels = aut.num_action_labels();
 
     std::vector<std::vector<transition>> label2buckettrans(num_labels);
-    
+    label2currentbucket = std::vector<block_type>(num_labels);
+    pred_buckets = std::vector<std::vector<state_counter_pair>>(num_labels);
+
     //Count transitions per state
     for (auto r = trans.begin(); r != trans.end(); r++) {
       state2in[r->to()] += 1;
       state2out[r->to()] += 1;
       label2buckettrans[r->label()].push_back((*r));
     }
+    std::vector<std::vector<state_counter_pair>> state2transitions(aut.num_states());
     transition_type num_trans = 0;
     for (label_type a = 0; a < num_labels; ++a)
     {
       std::set<state_type> dirty;
       // TODO: Inefficient, don't use maps find better way for this.
-      std::map<state_type, std::vector<state_counter_pair>> state2preds;
       std::map<transition_type, transition_type> createdcountermap;
 
       for (auto r = label2buckettrans[a].begin(); r != label2buckettrans[a].end(); r++)
@@ -99,16 +101,19 @@ public:
           transition2counter[num_trans] = createdcountermap[r->from()];
           counter_map[transition2counter[num_trans]].add_transition();
         }
-        state2preds[r->to()].push_back(state_counter_pair(r->from(), num_trans));
-        dirty.insert(r->to());
+        if (dirty.insert(r->to()).second)
+        {
+          state2transitions[r->to()].clear();
+        }
+        state2transitions[r->to()].push_back(state_counter_pair(r->from(), num_trans));
         num_trans += 1;
       }
 
       for (auto s : dirty)
       {
         std::vector<state_counter_pair> preds;
-        preds.reserve(state2preds[s].size());
-        for (auto sp : state2preds[s])
+        preds.reserve(state2transitions[s].size());
+        for (auto sp : state2transitions[s])
         {
           preds.push_back(sp);
         }
@@ -139,6 +144,7 @@ public:
     // Initialize block map
     worklist = std::queue<superpartition>();
     block_map = std::vector<block>();
+
 
     // Initialize blocks
     block b0(0, (unsigned int)aut.num_states());
@@ -177,10 +183,11 @@ public:
       // mCRL2log(mcrl2::log::debug) << "location " << i << " is in block " << blocks[loc2state[i]] << std::endl;
     }
 
-    mCRL2log(mcrl2::log::info) << "Done total blocks: \"" << block_set.size() << "\"" << std::endl;
+    mCRL2log(mcrl2::log::info) << "Done total blocks: \"" << block_set.size() << "\" in "
+                               << std::chrono::duration_cast<std::chrono::milliseconds>(stop - start).count() << std::endl;
 
-    worklist.push(c0);
-    refine();
+    //worklist.push(c0);
+    //refine();
 
     block_set.clear();
     for (state_type i = 0; i < aut.num_states(); i++)
@@ -352,6 +359,9 @@ std::vector<pred_bucket_type>* pred;
 std::vector<transition_type> transition2counter;
 block_type* blocks;
 std::vector<block> block_map;
+std::vector<block_type> label2currentbucket;
+std::vector<std::vector<state_counter_pair>> pred_buckets;
+
 state_type* loc2state;
 state_type* state2loc;
 std::vector<reference_counter> counter_map;
@@ -372,7 +382,6 @@ bool splitOn(block B)
 
   mCRL2log(mcrl2::log::debug) << "Splitting on block " << B.start << " " << B.end << " " << B_states.size() << std::endl;
   // Loop (labelled) through all incoming transitions.
-  std::vector<std::vector<state_counter_pair>> pred_buckets(aut.num_action_labels());
   std::set<label_type> labels;
 
   for (state_type s : B_states)
@@ -380,16 +389,19 @@ bool splitOn(block B)
     for (auto p : pred[s])
     {
       label_type a = p.first;
-      labels.insert(a);
-      if (pred_buckets[a].size() == 0)
+      // Rework this..
+      if (labels.insert(a).second)
       {
-        pred_buckets[a] = std::vector<state_counter_pair>();
-      }
+				// We should split on this label.
+				label2currentbucket[a] = Bid;
+				pred_buckets[a].clear();
+			}
+
       // Add all a-predecessors to the corresponding buckets.
       // TODO: Maybe this is a performance hit? We might only copy the references to the correct buckets. 
-      for (auto& state : p.second)
+      for (auto statecounterpair : p.second)
       {
-				pred_buckets[a].push_back(state);
+        pred_buckets[a].push_back(statecounterpair);
 			}
     }
   }
@@ -420,17 +432,10 @@ bool splitOn(block B)
     // Split the blocks we touched.
     for (block_type Bid : blocks_touched)
     {
-      block Bprime = block_map[Bid];
-      if (Bprime.empty != Bprime.start || Bprime.mid != Bprime.start)
-      {
-        split(Bprime);
-        splitted = true;
-      }
+      split(Bid);
     }
-
   }
-
-  return splitted;
+  return true;
 }
 
 void printState(state_type s) { 
@@ -450,7 +455,7 @@ void printBlock(block_type Bid) {
   }
   else
   {
-    mCRL2log(mcrl2::log::debug) << "Block: " << Bid << " s:" << B.start << " e:" << B.empty << " m:" << B.mid << " " << B.end << " f:" << B.fresh << std::endl;
+    mCRL2log(mcrl2::log::debug) << "Block: " << Bid << " s:" << B.start << " e:" << B.empty << " m:" << B.mid << " end:" << B.end << " f:" << B.fresh << std::endl;
   }
 }
 
@@ -498,6 +503,12 @@ void double_mark(state_type s) {
   block_type Bid = blocks[s]; // s is already marked, so we should look at parent
   block B = block_map[Bid];
   block Bp = block_map[B.parent_block];
+  if (Bp.empty > state2loc[s])
+  {
+    // We should not double mark, as we are already in the empty part.
+    // However this is NOT supposed to happen :/
+    return;
+  }
   if (Bp.empty == Bp.start)
   {
     // New block
@@ -521,8 +532,36 @@ void double_mark(state_type s) {
                               << block_map[B.parent_block].mid << " " << block_map[B.parent_block].end << std::endl;*/
 }
 
-void split(block B) {
+ void sanityCheckBlock(block_type Bid)
+{
+  block B = block_map[Bid];
+  if (B.start > B.empty || B.empty > B.mid || B.mid > B.end)
+  {
+    mCRL2log(mcrl2::log::debug) << "Block " << Bid << " is not sorted" << std::endl;
+  }
+  if (B.parent_block != Bid)
+  {
+    block Bp = block_map[B.parent_block];
+    if (Bp.start > B.start || Bp.empty > B.empty || Bp.mid > B.mid || Bp.end > B.end)
+    {
+      mCRL2log(mcrl2::log::debug) << "Block " << Bid << " is not sorted" << std::endl;
+    }
+  }
+  for (state_type i = B.start; i < B.end; i++)
+  {
+    if (blocks[loc2state[i]] != Bid)
+    {
+			mCRL2log(mcrl2::log::debug) << "Block " << Bid << " is not correct" << std::endl;
+      mCRL2log(mcrl2::log::debug) << "State " << i << " is in block " << blocks[loc2state[i]] << std::endl;
+      printBlock(Bid);
+      return;
+		}
+	}
+ }
+
+void split(block_type Bid) {
   //split the block B {start, empty, mid, end} into new blocks.
+  block B = block_map[Bid];
   block b2 = block(B.start, B.empty);
   block b1 = block(B.empty, B.mid);
   
@@ -530,6 +569,7 @@ void split(block B) {
   {
     b2.parent_block = B.new_B2;
     block_map[B.new_B2] = b2;
+    sanityCheckBlock(B.new_B2);
     /* mCRL2log(mcrl2::log::debug) << "test double marked block: ";
     printBlock(B.new_B2);*/
   }
@@ -542,23 +582,14 @@ void split(block B) {
   {
     mCRL2log(mcrl2::log::info) << "DOUBLE BLOCK!!";
   }
-  // If split performed and new block, add to worklist 
-  if (blocks[loc2state[B.start]] != blocks[loc2state[B.end - 1]])
-  {
-    printBlock(blocks[loc2state[B.start]]);
-    printBlock(blocks[loc2state[B.mid-1]]);
-    if (B.mid != B.end)
-    {
-      printBlock(blocks[loc2state[B.mid]]);
-    }
-  }
-  else
+  
+  if (blocks[loc2state[B.start]] == blocks[loc2state[B.end - 1]])
   {
     block_map[blocks[loc2state[B.start]]].fresh = B.fresh;
   }
   if (B.fresh && blocks[loc2state[B.start]] != blocks[loc2state[B.end - 1]])
   {
-    block_map[blocks[loc2state[B.start]]].fresh = false;
+    block_map[Bid].fresh = false;// Use Bid!!!!!
     worklist.push(superpartition{B.start, B.end});
   }
   // Resize the block B.
@@ -569,6 +600,16 @@ void split(block B) {
     block_map[blocks[loc2state[B.mid]]].parent_block = blocks[loc2state[B.mid]];
     B.new_B1 = 0;
     B.new_B2 = 0;
+  }
+  // If split performed and new block, add to worklist
+  if (blocks[loc2state[B.start]] != blocks[loc2state[B.end - 1]])
+  {
+    printBlock(blocks[loc2state[B.start]]);
+    printBlock(blocks[loc2state[B.mid - 1]]);
+    if (B.mid != B.end)
+    {
+      printBlock(blocks[loc2state[B.mid]]);
+    }
   }
 }
 
@@ -596,32 +637,31 @@ void refine()
   {
     iter++;
     superpartition C = worklist.front();
+    if (C.start > C.end)
+    {
+      continue;
+    }
     mCRL2log(mcrl2::log::debug) << "Refining superpartition " << C.start << " " << C.end << std::endl;
     if (blocks[loc2state[C.start]] == blocks[loc2state[C.end - 1]])
     {
-      // Superpartition has only one block, hence stable.
-      // We get this block for free.
       worklist.pop();
-      //splitOn(block_map[blocks[loc2state[C.start]]]);//TEMPORARY;
       block_map[blocks[loc2state[C.start]]].fresh = true; // If this block is split, we should add it to the worklist.
-      //worklist.push(superpartition{C.start, C.end});
       continue;
     }
 
     //logSuperPartition(C);
     block B1 = block_map[blocks[loc2state[C.start]]], B2 = block_map[blocks[loc2state[C.end - 1]]];
-
-    //mCRL2log(mcrl2::log::debug) << "sizeB1: " << B1.size() << " sizeB2:" << B2.size() << std::endl;
-
     block B = (B1.size() < B2.size()) ? B1 : B2;
     splitOn(B);
     // We did our work. for B. The blocks inside B should now be their own superpartition.
-    //mCRL2log(mcrl2::log::debug) << "Done splitting on block " << B.start << " " << B.end << std::endl;
-    //worklist.push(superpartition{B.start, B.end});
     
     if (blocks[loc2state[B.start]] != blocks[loc2state[B.end-1]])
     {
       // B is split on itself, hence we should add the range to the worklist.
+      if (B.start > B.end)
+      {
+        mCRL2log(mcrl2::log::debug) << "B.start > B.end" << std::endl;
+      }
       worklist.push(superpartition{B.start, B.end});
     }
     else
@@ -630,6 +670,12 @@ void refine()
     }
     
     // Update C, by removing B from the superpartition.
+    location_type new_start = B1.size() < B2.size() ? B.end : C.start;
+    location_type new_end = B1.size() < B2.size() ? C.end : B.start;
+    if (new_start > new_end)
+    {
+      mCRL2log(mcrl2::log::debug) << "new_start > new_end" << std::endl;
+    }
     worklist.front().start = (B1.size() < B2.size()) ? B.end : C.start;
     worklist.front().end = (B1.size() < B2.size()) ? C.end : B.start;
   }
