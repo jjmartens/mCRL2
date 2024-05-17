@@ -91,19 +91,21 @@ public:
 
     auto stop = std::chrono::high_resolution_clock::now();
     // Count blocks
-    state_type s = 0;
-    std::size_t num_blocks;
-    while (s < aut.num_states())
+    location_type loc = 0;
+    int num_blocks =0;
+    while (loc < aut.num_states())
     {
-			s = block_map[blocks[s]].end;
+      mCRL2log(mcrl2::log::debug) << loc << "Block " << block_map[blocks[loc2state[loc]]].start << ":"
+                                  << block_map[blocks[loc2state[loc]]].end << std::endl;
+			loc = block_map[blocks[loc2state[loc]]].end;
 			num_blocks++;
 		}
 
-    mCRL2log(mcrl2::log::info) << block_set.size() 
+    mCRL2log(mcrl2::log::info) << num_blocks 
                                << ":" << std::chrono::duration_cast<std::chrono::milliseconds>(mid - start).count()
                                << ":" << std::chrono::duration_cast<std::chrono::milliseconds>(stop - mid).count()
                                << std::endl;
-
+    finalize_minimized_LTS();
     // cleanup
     delete[] pred;
     delete[] state2loc;
@@ -219,28 +221,7 @@ struct reference_counter
   counter count = 1;
   
   transition_type new_counter=0;
-  observation_type new_split_obs;
-
-  bool touch(observation_type splitter, std::vector<reference_counter>& counters)
-  {
-    if (immutable)
-    {
-      // We don't need to worry about the counter it's only 1 transition.
-      return true;
-    }
-    count -= 1;
-    if (new_counter == 0 || splitter != new_split_obs)
-    {
-      new_counter = counters.size(); // We might not need from !?
-      counters.push_back(reference_counter(from));
-      new_split_obs = splitter;
-    }
-    else
-    {
-      counters[new_counter].add_transition();
-    }
-    return (count == 0);
-  }
+  observation_type new_split_obs = std::make_pair(0,0);
   
   counter get_count()
   { return count; 
@@ -345,6 +326,63 @@ void create_initial_partition_and_buckets() {
   // We should also make a map from transitions to counters;
 };
 
+bool touch_transition(transition_type counter, observation_type splitter)
+{
+  reference_counter& rc = counter_map[counter];
+  if (rc.immutable)
+  {
+    // We don't need to worry about the counter it's only 1 transition.
+    return true;
+  }
+  rc.count -= 1;
+  if (rc.new_counter == 0 || splitter != rc.new_split_obs)
+  {
+    rc.new_counter = counter_map.size();
+    reference_counter new_rc(rc.from);
+    counter_map.push_back(new_rc);
+    rc.new_split_obs = splitter;
+  }
+  else
+  {
+    counter_map[rc.new_counter].add_transition();
+  }
+  return (rc.count == 0);
+}
+
+void finalize_minimized_LTS()
+{
+  location_type loc = 0;
+  std::size_t num_blocks = 0;
+
+  while (loc < aut.num_states())
+  {
+    block_map[blocks[loc2state[loc]]].id = num_blocks;
+    loc = block_map[blocks[loc2state[loc]]].end;
+    num_blocks++;
+  }
+
+  aut.set_initial_state(block_map[blocks[aut.initial_state()]].id);
+  aut.set_num_states(num_blocks);
+  aut.clear_transitions();
+  // Make all the transitions
+  int num_trans = 0;
+  while (loc < aut.num_states())
+  {
+    state_type s = loc2state[loc];
+    auto predpointers = pred[s];
+    for (auto p : predpointers)
+    {
+      label_type a = p.first;
+      for (auto tcounterpair : predecessor_buckets[p.second])
+      {
+        aut.add_transition(transition(block_map[blocks[tcounterpair.first]].id, a, block_map[blocks[s]].id));
+        num_trans++;
+      }
+    }
+    loc = block_map[blocks[loc2state[loc]]].end;
+  }
+}
+
 // Split such that the partition is stable w.r.t. B, and C \ B. (Where C is the superpartition\constellation of B). 
 bool splitOn(block B, std::size_t iter)
 {
@@ -382,13 +420,18 @@ bool splitOn(block B, std::size_t iter)
     observation_type splitter = std::make_pair(a, Bid);
     for (transition_type bucket_number : splitting_buckets[a])
     {
-      mCRL2log(mcrl2::log::debug) << "Splitting on bucket " << bucket_number << " of "<< predecessor_buckets.size() << std::endl;
+      mCRL2log(mcrl2::log::debug) << a << " Splitting on bucket " << bucket_number << " of "<< predecessor_buckets.size() << std::endl;
       for (const auto& scounterpair : predecessor_buckets[bucket_number])
       {
         // Means s -a-> B
         mark(scounterpair.first, blocks_touched);
         // The reference to s-a-> C should be decreased
-        if (counter_map[transition2counter[scounterpair.second]].touch(splitter, counter_map))
+        if (transition2counter[scounterpair.second] > counter_map.size())
+        {
+          mCRL2log(mcrl2::log::debug) << "transition2counter[scounterpair.second] > counter_map.size()" << std::endl;
+          assert(false);
+        }
+        if (touch_transition(transition2counter[scounterpair.second], splitter))
         {
           double_mark(scounterpair.first);
         }
@@ -400,6 +443,7 @@ bool splitOn(block B, std::size_t iter)
         }
       }
     }
+    mCRL2log(mcrl2::log::debug) << "ha" << std::endl;
 
     // Split the blocks we touched.
     for (block_type Bid : blocks_touched)
@@ -541,7 +585,7 @@ void split(block_type Bid) {
   {
     b2.parent_block = B.new_B2;
     block_map[B.new_B2] = b2;
-    sanityCheckBlock(B.new_B2);
+    //sanityCheckBlock(B.new_B2);
     /* mCRL2log(mcrl2::log::debug) << "test double marked block: ";
     printBlock(B.new_B2);*/
   }
