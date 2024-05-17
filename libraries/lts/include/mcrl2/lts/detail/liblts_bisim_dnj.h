@@ -3560,11 +3560,12 @@ class bisim_partitioner_dnj
         create_initial_partition();                                             ONLY_IF_DEBUG( part_tr.action_block_orig_inert_begin =
                                                                                                                             part_tr.action_block_inert_begin; )
         auto mid = std::chrono::high_resolution_clock::now();
-        mCRL2log(mcrl2::log::info) << "Init:" << std::chrono::duration_cast<std::chrono::milliseconds>(mid - start).count() << std::endl;
+        auto init = std::chrono::duration_cast<std::chrono::milliseconds>(mid - start);
+        //mCRL2log(mcrl2::log::info) << "Init:" << std::chrono::duration_cast<std::chrono::milliseconds>(mid - start).count() << std::endl;
          refine_partition_until_it_becomes_stable();
          auto end = std::chrono::high_resolution_clock::now();
-         mCRL2log(mcrl2::log::info) << "Refine:" << std::chrono::duration_cast<std::chrono::milliseconds>(end - mid).count() << std::endl;
-         mCRL2log(mcrl2::log::info) << "Num states:" << num_eq_classes() << std::endl;
+         //mCRL2log(mcrl2::log::info) << "Refine:" << std::chrono::duration_cast<std::chrono::milliseconds>(end - mid).count() << std::endl;
+         mCRL2log(mcrl2::log::info) << num_eq_classes() << ":" << init.count() << ":" << std::chrono::duration_cast<std::chrono::milliseconds>(end - mid).count() << std::endl;
     }
 
 
@@ -5509,15 +5510,12 @@ void bisimulation_reduce_dnj(LTS_TYPE& l, bool const branching = false,
     {
         scc_reduce(l, preserve_divergence);
     }
-    auto start = std::chrono::high_resolution_clock::now();
+
     // Now apply the branching bisimulation reduction algorithm.  If there
     // are no taus, this will automatically yield strong bisimulation.
     bisim_partitioner_dnj<LTS_TYPE> bisim_part(l, branching,
                                                           preserve_divergence);
-    auto stop = std::chrono::high_resolution_clock::now();
-    auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(stop - start);
-    mCRL2log(mcrl2::log::info) << "Total time: " << duration.count() << "ms\n";
-    // Assign the reduced LTS
+     // Assign the reduced LTS
     bisim_part.finalize_minimized_LTS();
 }
 

@@ -1225,13 +1225,11 @@ void bisimulation_reduce_martens(LTS_TYPE& l, bool const branching = false, //Do
     {
       scc_reduce(l, false);
     }
-    mCRL2log(mcrl2::log::info) << "flagging: " << std::endl;
     // Now apply the branching bisimulation reduction algorithm.  If there
     // are no taus, this will automatically yield strong bisimulation.
     bisim_partitioner_martens<LTS_TYPE> bisim_part(l);
     // Assign the reduced LTS
     //bisim_part.finalize_minimized_LTS();
-    mCRL2log(mcrl2::log::info) << "Number of states after minimization: " << bisim_part.num_eq_classes() << std::endl;
 }
 
 

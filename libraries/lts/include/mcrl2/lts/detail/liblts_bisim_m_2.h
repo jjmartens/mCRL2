@@ -46,101 +46,26 @@ public:
     aut(l)
   {
     auto start = std::chrono::high_resolution_clock::now();
-
-    const std::vector<transition>& trans = aut.get_transitions();
-    // We should do this much smarter
-    //Initialize arrays for pred and suc, blocks and state2loc and loc2state
-    pred = new std::vector<pred_bucket_type>[aut.num_states()];
-    transition2counter = std::vector<std::size_t>(aut.num_transitions());
-    counter_map = std::vector<reference_counter>();
-
-    for (state_type s = 0; s < aut.num_states(); s++)
-    {
-			pred[s] = std::vector<pred_bucket_type>();
-		}
-
-    blocks = new block_type[aut.num_states()];
+    pred = new std::vector < std::pair<label_type, transition_type>>[aut.num_states()];
     state2loc = new state_type[aut.num_states()];
     loc2state = new state_type[aut.num_states()];
-    std::vector<int> state2in = std::vector<int>(aut.num_states(), 0);
-    std::vector<int> state2out = std::vector<int>(aut.num_states(), 0);
+    blocks = new block_type[aut.num_states()];
+    counter_map = std::vector<reference_counter>();
+    transition2counter = std::vector<std::size_t>(aut.num_transitions());
+    label2currentiter = std::vector<block_type>(aut.num_action_labels(), 1);
+    splitting_buckets = std::vector<std::vector<std::size_t>>(aut.num_action_labels());
+    // Initialize arrays for pred and suc, blocks and state2loc and loc2state
+
     mCRL2log(mcrl2::log::debug) << "start moving transitions " << std::endl;
-    std::size_t num_labels = aut.num_action_labels();
 
-    std::vector<std::vector<transition>> label2buckettrans(num_labels);
-    label2currentbucket = std::vector<block_type>(num_labels);
-    pred_buckets = std::vector<std::vector<state_counter_pair>>(num_labels);
+    create_initial_partition_and_buckets();
+    auto after_init = std::chrono::high_resolution_clock::now();
 
+    mCRL2log(mcrl2::log::debug) << std::chrono::duration_cast<std::chrono::milliseconds>(after_init - start).count()
+                                << std::endl;
     //Count transitions per state
-    for (auto r = trans.begin(); r != trans.end(); r++) {
-      state2in[r->to()] += 1;
-      state2out[r->to()] += 1;
-      label2buckettrans[r->label()].push_back((*r));
-    }
-    std::vector<std::vector<state_counter_pair>> state2transitions(aut.num_states());
-    transition_type num_trans = 0;
-    for (label_type a = 0; a < num_labels; ++a)
-    {
-      std::set<state_type> dirty;
-      // TODO: Inefficient, don't use maps find better way for this.
-      std::map<transition_type, transition_type> createdcountermap;
+    mCRL2log(mcrl2::log::debug) << "moved all transitions" << std::endl;
 
-      for (auto r = label2buckettrans[a].begin(); r != label2buckettrans[a].end(); r++)
-      {
-        reference_counter rc(r->from());
-        if (createdcountermap.find(r->from()) == createdcountermap.end())
-        {
-          // This seems very obfuscated.
-          // The info should be reset in the first iteration, 0 might be colliding.
-          createdcountermap[r->from()] = counter_map.size();
-          transition2counter[num_trans] = counter_map.size(); 
-          counter_map.push_back(rc);
-        }
-        else
-        {
-          transition2counter[num_trans] = createdcountermap[r->from()];
-          counter_map[transition2counter[num_trans]].add_transition();
-        }
-        if (dirty.insert(r->to()).second)
-        {
-          state2transitions[r->to()].clear();
-        }
-        state2transitions[r->to()].push_back(state_counter_pair(r->from(), num_trans));
-        num_trans += 1;
-      }
-
-      for (auto s : dirty)
-      {
-        std::vector<state_counter_pair> preds;
-        preds.reserve(state2transitions[s].size());
-        for (auto sp : state2transitions[s])
-        {
-          preds.push_back(sp);
-        }
-        pred[s].push_back(std::make_pair(a, preds));
-      }
-    }
-
-    mCRL2log(mcrl2::log::debug) << "moved all transitions" << num_trans << std::endl;
-    // Log predecessor structure for debug:
-
-    if (false)
-    {
-      for (state_type i = 0; i < aut.num_states(); ++i)
-      {
-        mCRL2log(mcrl2::log::debug) << "State " << i << " has " << pred[i].size() << " predecessors:" << std::endl;
-        for (auto p : pred[i])
-        {
-          mCRL2log(mcrl2::log::debug) << "\t -" << aut.action_labels()[p.first] << "-> :\n";
-          for (auto sp : p.second)   
-          {
-            mCRL2log(mcrl2::log::debug) << "\t\t" << sp.first << "ref: ";
-            mCRL2log(mcrl2::log::debug) << sp.second << ", " << counter_map[transition2counter[sp.second]].get_count() << "\n ";
-          }
-          mCRL2log(mcrl2::log::debug) << std::endl;
-        }
-      }
-    }
     // Initialize block map
     worklist = std::queue<superpartition>();
     block_map = std::vector<block>();
@@ -148,23 +73,14 @@ public:
 
     // Initialize blocks
     block b0(0, (unsigned int)aut.num_states());
-    b0.parent_block = 0;
-
+    b0.parent_block = 0; 
     superpartition c0{0, (unsigned int)aut.num_states()};
 
-    for (state_type i = 0; i < (unsigned int)aut.num_states(); i++)
-    {
-      blocks[i] = 0;
-      state2loc[i] = i;
-      loc2state[i] = i;
-    }
     block_map.push_back(b0);
     auto mid = std::chrono::high_resolution_clock::now();
-    mCRL2log(mcrl2::log::info) << "init:"
-                                << std::chrono::duration_cast<std::chrono::milliseconds>(mid - start).count()
-                                << std::endl;
+
     // initialize worklist
-    splitOn(b0);
+    splitOn(b0, 0);
     worklist.push(c0);
 
     mCRL2log(mcrl2::log::debug) << "Done initial split max_block:" << block_map.size() << std::endl;
@@ -174,28 +90,19 @@ public:
     refine();
 
     auto stop = std::chrono::high_resolution_clock::now();
-    auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(stop - mid);
-    mCRL2log(mcrl2::log::info) << "refining:" << duration.count() << std::endl;
-    std::set<block_type> block_set;
-    for (state_type i = 0; i < aut.num_states(); i++)
+    // Count blocks
+    state_type s = 0;
+    std::size_t num_blocks;
+    while (s < aut.num_states())
     {
-      block_set.insert(blocks[i]);
-      // mCRL2log(mcrl2::log::debug) << "location " << i << " is in block " << blocks[loc2state[i]] << std::endl;
-    }
+			s = block_map[blocks[s]].end;
+			num_blocks++;
+		}
 
-    mCRL2log(mcrl2::log::info) << "Done total blocks: \"" << block_set.size() << "\" in "
-                               << std::chrono::duration_cast<std::chrono::milliseconds>(stop - start).count() << std::endl;
-
-    //worklist.push(c0);
-    //refine();
-
-    block_set.clear();
-    for (state_type i = 0; i < aut.num_states(); i++)
-    {
-      block_set.insert(blocks[i]);
-      // mCRL2log(mcrl2::log::debug) << "location " << i << " is in block " << blocks[loc2state[i]] << std::endl;
-    }
-    mCRL2log(mcrl2::log::info) << "Done total blocks: \"" << block_set.size() << "\"" << std::endl;
+    mCRL2log(mcrl2::log::info) << block_set.size() 
+                               << ":" << std::chrono::duration_cast<std::chrono::milliseconds>(mid - start).count()
+                               << ":" << std::chrono::duration_cast<std::chrono::milliseconds>(stop - mid).count()
+                               << std::endl;
 
     // cleanup
     delete[] pred;
@@ -244,7 +151,6 @@ private:
   typedef int counter;
   typedef std::pair<state_type, transition_type> state_counter_pair;
   typedef std::pair<label_type, block_type> observation_type;
-  typedef std::pair<label_type, std::vector<state_counter_pair>> pred_bucket_type;
   typedef std::pair<label_type, block_type> action_block_type; 
 
   state_type max_state_index;
@@ -355,25 +261,92 @@ struct reference_counter
 };
 
 // Data structures; representing the partition and the Predecessors. 
-std::vector<pred_bucket_type>* pred;
+std::vector<std::pair<label_type, std::size_t>>* pred;
+std::vector<std::vector<state_counter_pair>> predecessor_buckets;
 std::vector<transition_type> transition2counter;
 block_type* blocks;
 std::vector<block> block_map;
-std::vector<block_type> label2currentbucket;
-std::vector<std::vector<state_counter_pair>> pred_buckets;
+std::vector<block_type> label2currentiter;
+std::vector<std::vector<std::size_t>> splitting_buckets; //pointing to the buckets.
 
 state_type* loc2state;
 state_type* state2loc;
 std::vector<reference_counter> counter_map;
 std::queue<superpartition> worklist;
 
+struct trans_wrapper {
+  const transition* ptr;
+  transition_type trans_id;
+};
 
-void create_initial_partition() {
+void create_initial_partition_and_buckets() {
+  transition_type trans_num = 0;
+  std::vector<std::vector<trans_wrapper>> state2transitions(aut.num_states());
+  std::vector<std::vector<trans_wrapper>> state2out(aut.num_states());
+  for (auto trans = aut.get_transitions().begin(); trans != aut.get_transitions().end(); trans++)
+  {
+    trans_wrapper t{&(*trans), trans_num};
+    state2transitions[trans->to()].push_back(t); 
+    state2out[trans->from()].push_back(t);
+    trans_num++;
+  }
 
+  // For each state, create buckets for each label.
+  std::vector<std::vector<state_counter_pair>> label2bucket(aut.num_action_labels());
+  std::vector<state_type> last_state_touched(aut.num_action_labels(), aut.num_states()+1);
+  std::vector<transition_type> new_counter(aut.num_action_labels(), 0);
+  counter_map.push_back(reference_counter(0));//dummy so 0 is clear.
 
-}
+  for (state_type s = 0; s < aut.num_states(); s++)
+	{
+    // Basic initialization
+    state2loc[s] = s;
+    loc2state[s] = s;
+    blocks[s] = 0;
+    // Make buckets for all trans -a-> s
+    std::vector<label_type> labels_used;
+    for (const auto& t : state2transitions[s])
+    {
+      if (last_state_touched[t.ptr->label()] != s)
+      {
+				labels_used.push_back(t.ptr->label());
+        label2bucket[t.ptr->label()].clear();
+        last_state_touched[t.ptr->label()] = s;
+			}
+      label2bucket[t.ptr->label()].push_back(std::make_pair(t.ptr->from(), t.trans_id));
+    }
+    pred[s].reserve(labels_used.size());
+    for (const label_type a : labels_used)
+    {
+      pred[s].push_back(std::make_pair(a, predecessor_buckets.size()));
+      predecessor_buckets.push_back(std::vector<state_counter_pair>());
+      predecessor_buckets.back().reserve(label2bucket[a].size());
+      std::copy(label2bucket[a].begin(), label2bucket[a].end(), std::back_inserter(predecessor_buckets.back()));
+    }
+
+    // Set counters correctly for s -a->
+    for (const auto& t : state2out[s])
+    {
+      if (new_counter[t.ptr->label()] == 0 || counter_map[new_counter[t.ptr->label()]].from != s)
+      {
+        reference_counter rc(s);
+        new_counter[t.ptr->label()] = counter_map.size();
+        counter_map.push_back(rc);
+        transition2counter[t.trans_id] = new_counter[t.ptr->label()];
+      }
+      else
+      {
+        transition2counter[t.trans_id] = new_counter[t.ptr->label()];
+        counter_map[new_counter[t.ptr->label()]].add_transition();
+      }
+		}
+  }
+  // Done moving all transitions, we should now make references_counters for each transition.
+  // We should also make a map from transitions to counters;
+};
+
 // Split such that the partition is stable w.r.t. B, and C \ B. (Where C is the superpartition\constellation of B). 
-bool splitOn(block B)
+bool splitOn(block B, std::size_t iter)
 {
   bool splitted = false;
   block_type Bid = blocks[loc2state[B.start]];
@@ -382,7 +355,7 @@ bool splitOn(block B)
 
   mCRL2log(mcrl2::log::debug) << "Splitting on block " << B.start << " " << B.end << " " << B_states.size() << std::endl;
   // Loop (labelled) through all incoming transitions.
-  std::set<label_type> labels;
+  std::vector<label_type> labels;
 
   for (state_type s : B_states)
   {
@@ -390,21 +363,16 @@ bool splitOn(block B)
     {
       label_type a = p.first;
       // Rework this..
-      if (labels.insert(a).second)
+      if (label2currentiter[a] != iter)
       {
-				// We should split on this label.
-				label2currentbucket[a] = Bid;
-				pred_buckets[a].clear();
-			}
-
-      // Add all a-predecessors to the corresponding buckets.
-      // TODO: Maybe this is a performance hit? We might only copy the references to the correct buckets. 
-      for (auto statecounterpair : p.second)
-      {
-        pred_buckets[a].push_back(statecounterpair);
-			}
+        labels.push_back(a);
+        label2currentiter[a] = iter;
+        splitting_buckets[a].clear();
+      }
+      splitting_buckets[a].push_back(p.second);
     }
   }
+  mCRL2log(mcrl2::log::debug) << "nEXT! " << std::endl;
   // For each label, split all blocks.
   for (label_type a : labels)
   {
@@ -412,20 +380,24 @@ bool splitOn(block B)
     // TODO: make the correct splitting
     std::vector<block_type> blocks_touched;
     observation_type splitter = std::make_pair(a, Bid);
-    for (state_counter_pair scounterpair : pred_buckets[a])
+    for (transition_type bucket_number : splitting_buckets[a])
     {
-      // Means s -a-> B
-      mark(scounterpair.first, blocks_touched);
-      // The reference to s-a-> C should be decreased
-      if (counter_map[transition2counter[scounterpair.second]].touch(splitter, counter_map))
+      mCRL2log(mcrl2::log::debug) << "Splitting on bucket " << bucket_number << " of "<< predecessor_buckets.size() << std::endl;
+      for (const auto& scounterpair : predecessor_buckets[bucket_number])
       {
-        double_mark(scounterpair.first);
-      }
-      if (!(counter_map[transition2counter[scounterpair.second]].immutable))
-      {
-        // We should split the block, and update the reference to the new counter.
-        // This is a double mark.
-        transition2counter[scounterpair.second] = counter_map[transition2counter[scounterpair.second]].new_counter;
+        // Means s -a-> B
+        mark(scounterpair.first, blocks_touched);
+        // The reference to s-a-> C should be decreased
+        if (counter_map[transition2counter[scounterpair.second]].touch(splitter, counter_map))
+        {
+          double_mark(scounterpair.first);
+        }
+        if (!(counter_map[transition2counter[scounterpair.second]].immutable))
+        {
+          // We should split the block, and update the reference to the new counter.
+          // This is a double mark.
+          transition2counter[scounterpair.second] = counter_map[transition2counter[scounterpair.second]].new_counter;
+        }
       }
     }
 
@@ -635,7 +607,7 @@ void refine()
   int stableinrow = 0;
   while (!worklist.empty())
   {
-    iter++;
+    iter += 1;
     superpartition C = worklist.front();
     if (C.start > C.end)
     {
@@ -652,7 +624,7 @@ void refine()
     //logSuperPartition(C);
     block B1 = block_map[blocks[loc2state[C.start]]], B2 = block_map[blocks[loc2state[C.end - 1]]];
     block B = (B1.size() < B2.size()) ? B1 : B2;
-    splitOn(B);
+    splitOn(B,iter);
     // We did our work. for B. The blocks inside B should now be their own superpartition.
     
     if (blocks[loc2state[B.start]] != blocks[loc2state[B.end-1]])
