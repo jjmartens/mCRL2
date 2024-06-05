@@ -1200,7 +1200,7 @@ bool destructive_bisimulation_compare_martens(
     mcrl2::lts::detail::merge(l1, l2);
     l2.clear(); // No use for l2 anymore.
     detail::bisim_partitioner_martens<LTS_TYPE> bisim_partitioner_martens(l1);
-    if (bisim_partitioner_martens.in_same_class(l1.initial_state(), init_l2))
+        if (bisim_partitioner_martens.in_same_class(l1.initial_state(), init_l2))
     {
         return true;
     }

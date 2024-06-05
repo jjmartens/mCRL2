@@ -596,7 +596,7 @@ void split(block_type Bid) {
   }
   if (b1.size() != 0 && b2.size() != 0)
   {
-    mCRL2log(mcrl2::log::info) << "DOUBLE BLOCK!!";
+    mCRL2log(mcrl2::log::debug) << "DOUBLE BLOCK!!";
   }
   
   if (blocks[loc2state[B.start]] == blocks[loc2state[B.end - 1]])
